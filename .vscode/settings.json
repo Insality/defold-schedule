@@ -1,5 +1,9 @@
 {
 	"Lua.diagnostics.globals": [
 		"socket"
+	],
+	"Lua.workspace.library": [
+		"~/Library/Application Support/Cursor/User/globalStorage/astronachos.defold",
+		"~/Library/Application Support/Cursor/User/workspaceStorage/d1eb4661d9b8d79d383e12615986c582/astronachos.defold"
 	]
 }

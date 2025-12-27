@@ -83,6 +83,7 @@ schedule.event()
 	-- When to start, choose one of the following
 	:after(time)
 	:start_at(time) -- Unix seconds or ISO (YYYY-MM-DDTHH:MM:SS)
+	-- Note: Weekly and yearly cycles can work without start_at - they compute next occurrence from now
 	-- When to end, choose one of the following
 	:duration(time)
 	:end_at(time)
@@ -93,7 +94,9 @@ schedule.event()
 	:on_fail("cancel|abort")
 	-- Repeat
 	:cycle("every", { seconds = 60, anchor = "start|end", skip_missed = true })
-	:cycle("yearly", { anchor = "start|end", skip_missed = true })
+	:cycle("weekly", { weekdays = {"sun"}, time = "HH:MM", skip_missed = true })
+	:cycle("monthly", { day = 1..31, time = "HH:MM", skip_missed = true })
+	:cycle("yearly", { month = 1..12, day = 1..31, time = "HH:MM", skip_missed = true })
 	:catch_up(true|false) -- do not catch up if missed. With duration default is false, without - true
 	-- Complete
 	:save()
