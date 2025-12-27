@@ -86,10 +86,15 @@ schedule.event()
 	-- When to end, choose one of the following
 	:duration(time)
 	:end_at(time)
+	:infinity() -- Works until manual cancellation
 	:min_time(time) -- Do not start if not enough time left
 	-- Conditions
 	:condition(condition_name, data)
 	:on_fail("cancel|abort")
+	-- Repeat
+	:cycle("every", { seconds = 60, anchor = "start|end", skip_missed = true })
+	:cycle("yearly", { anchor = "start|end", skip_missed = true })
+	:catch_up(true|false) -- do not catch up if missed. With duration default is false, without - true
 	-- Complete
 	:save()
 ```

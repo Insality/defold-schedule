@@ -28,6 +28,8 @@ schedule.event()
 	:category("liveops")
 	:start_at("2026-01-01T00:00:00")
 	:duration(7 * schedule.DAY)
+	:cycle("every", { seconds = 4 * schedule.HOUR, anchor = "start", skip_missed = true })
+	:catch_up(false) -- do not catch up if missed
 	:payload({ event_id = "new_year" })
 	:min_time(1 * schedule.DAY) -- do not start if not enough time left
 	:save()
