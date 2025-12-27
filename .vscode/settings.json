@@ -1,9 +1,39 @@
 {
 	"Lua.diagnostics.globals": [
-		"socket"
+		"on_message",
+		"init",
+		"final",
+		"update",
+		"on_input",
+		"defos",
+		"diags",
+		"filedrop",
+		"clipboard",
+		"screenshot",
+		"share",
+		"pb",
+		"uptime",
+		"lua_script_instance",
+		"spine",
+		"on_reload",
+		"utf8",
+		"lfs",
+		"chronos",
+		"pprint",
+		"before",
+		"after",
+		"it",
+		"describe",
+		"json",
+		"timer",
+		"socket",
+		"assert_equal",
+		"sys",
+		"event_context_manager"
 	],
 	"Lua.workspace.library": [
 		"~/Library/Application Support/Cursor/User/globalStorage/astronachos.defold",
+		"~/Library/Application Support/Cursor/User/workspaceStorage/9ea25e721be13ba4ff17788d335991b8/astronachos.defold",
 		"~/Library/Application Support/Cursor/User/workspaceStorage/d1eb4661d9b8d79d383e12615986c582/astronachos.defold"
 	]
 }
