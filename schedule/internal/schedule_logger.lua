@@ -1,4 +1,4 @@
----@class token.logger
+---@class schedule.logger
 ---@field trace fun(_, msg: string, data: any)
 ---@field debug fun(_, msg: string, data: any)
 ---@field info fun(_, msg: string, data: any)
@@ -8,7 +8,7 @@ local M = {}
 
 local EMPTY_FUNCTION = function(_, message, context) end
 
----@type token.logger
+---@type schedule.logger
 local empty_logger = {
 	trace = EMPTY_FUNCTION,
 	debug = EMPTY_FUNCTION,
@@ -17,7 +17,7 @@ local empty_logger = {
 	error = EMPTY_FUNCTION,
 }
 
----@type token.logger
+---@type schedule.logger
 local default_logger = {
 	trace = function(_, msg, data) print("TRACE: " .. msg, M.table_to_string(data)) end,
 	debug = function(_, msg, data) print("DEBUG: " .. msg, M.table_to_string(data)) end,

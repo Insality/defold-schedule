@@ -58,10 +58,44 @@ https://github.com/Insality/defold-schedule/archive/refs/tags/1.zip
 
 ```lua
 local schedule = require("schedule.schedule")
+
+-- Events
+schedule.event()
+schedule.get_status(event_id)
+
+schedule.register_condition(condition_name, fun(data))
+
+-- State
+schedule.get_state()
+schedule.set_state(new_state)
+schedule.reset_state()
+
+-- System
+schedule.set_logger([logger_instance])
+```
+
+```lua
+local schedule = require("schedule.schedule")
+
+schedule.event()
+	:category(category_name)
+	:payload(payload)
+	-- When to start, choose one of the following
+	:after(time)
+	:start_at(time) -- Unix seconds or ISO (YYYY-MM-DDTHH:MM:SS)
+	-- When to end, choose one of the following
+	:duration(time)
+	:end_at(time)
+	:min_time(time) -- Do not start if not enough time left
+	-- Conditions
+	:condition(condition_name, data)
+	:on_fail("cancel|abort")
+	-- Complete
+	:save()
 ```
 
 For detailed API documentation, please refer to:
-- [API Reference](api/schedule-api.md)
+- [API Reference](api/schedule_api.md)
 
 
 ## Use Cases
