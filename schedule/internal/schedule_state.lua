@@ -86,10 +86,10 @@ end
 
 ---Set event state
 ---@param event_id string
----@param status schedule.event.state
-function M.set_event_state(event_id, status)
-	status.event_id = event_id
-	state.events[event_id] = status
+---@param event_state schedule.event.state
+function M.set_event_state(event_id, event_state)
+	event_state.event_id = event_id
+	state.events[event_id] = event_state
 end
 
 

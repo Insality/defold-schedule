@@ -1,7 +1,7 @@
 local state = require("schedule.internal.schedule_state")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
 local logger = require("schedule.internal.schedule_logger")
-local event_class = require("schedule.internal.schedule_event")
+local event = require("schedule.internal.schedule_event")
 
 local event_id_counter = 0
 
@@ -375,31 +375,12 @@ function M:save()
 
 	self.event_id = event_id
 
-	local event_status = state.get_event_state(event_id)
-	if event_status then
-		local event_instance = event_class.create(event_status)
-		if event_instance then
-			setmetatable(self, {
-				__index = function(t, k)
-					if M[k] then
-						return M[k]
-					end
-					local method = event_instance[k]
-					if method and type(method) == "function" then
-						return function(...)
-							local args = {...}
-							args[1] = event_instance
-							return method(unpack(args))
-						end
-					end
-					return method
-				end
-			})
-		end
-	end
+	local event_state = state.get_event_state(event_id)
+	assert(event_state, "Event state must exist")
+	local event_instance = event.create(event_state)
 
 	logger:debug("Event saved", { event_id = event_id, category = self.config.category })
-	return self
+	return event_instance
 end
 
 

@@ -11,11 +11,9 @@ local M = {}
 
 ---Create event instance
 ---@param event_state schedule.event.state
----@return schedule.event|nil event Event instance
+---@return schedule.event event Event instance
 function M.create(event_state)
-	local self = setmetatable({}, { __index = M })
-	self.state = event_state
-	return self
+	return setmetatable({ state = event_state }, { __index = M })
 end
 
 

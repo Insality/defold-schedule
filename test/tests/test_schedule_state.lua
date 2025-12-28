@@ -11,8 +11,8 @@ return function()
 
 		before(function()
 			schedule = require("schedule.schedule")
-			schedule_time.set_time_function = function() return time end
 			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
 			time = 0
 		end)
 
@@ -462,6 +462,7 @@ return function()
 			local state_copy = deep_copy_state(state)
 
 			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
 			time = 150
 
 			schedule.set_state(state_copy)

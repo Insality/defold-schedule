@@ -67,6 +67,7 @@ function M.reset_state()
 	conditions.reset()
 	M.on_event:clear()
 	emitted_events = {}
+	time_utils.set_time_function(nil)
 end
 
 

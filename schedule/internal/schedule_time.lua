@@ -42,22 +42,20 @@ local function get_days_in_year(year)
 end
 
 
----Custom time function override (for testing)
----@type fun():number|nil
-M.set_time_function = nil
+local get_time_callback = socket.gettime
+
+
+---Set custom time function callback
+---@param callback (fun():number)|nil
+function M.set_time_function(callback)
+	get_time_callback = callback or socket.gettime
+end
 
 
 ---Get current time in seconds
----Override this to use custom time source
 ---@return number
 function M.get_time()
-	if M.set_time_function then
-		local time = M.set_time_function()
-		if time then
-			return time
-		end
-	end
-	return socket.gettime()
+	return get_time_callback()
 end
 
 
