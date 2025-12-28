@@ -2,6 +2,46 @@
 local M = {}
 
 
+-- Constants
+local EPOCH_YEAR = 1970
+local DAYS_IN_YEAR = 365
+local DAYS_IN_LEAP_YEAR = 366
+local SECONDS_PER_DAY = 86400
+local SECONDS_PER_HOUR = 3600
+local SECONDS_PER_MINUTE = 60
+
+local DAYS_IN_MONTH = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+local DAYS_IN_MONTH_LEAP = { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+
+local WEEKDAY_TO_NUMBER = {
+	sun = 1, sunday = 1,
+	mon = 2, monday = 2,
+	tue = 3, tuesday = 3,
+	wed = 4, wednesday = 4,
+	thu = 5, thursday = 5,
+	fri = 6, friday = 6,
+	sat = 7, saturday = 7
+}
+
+local NUMBER_TO_WEEKDAY = { "sun", "mon", "tue", "wed", "thu", "fri", "sat" }
+
+
+---Check if year is a leap year
+---@param year number
+---@return boolean
+local function is_leap_year(year)
+	return (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0)
+end
+
+
+---Get days in year
+---@param year number
+---@return number
+local function get_days_in_year(year)
+	return is_leap_year(year) and DAYS_IN_LEAP_YEAR or DAYS_IN_YEAR
+end
+
+
 ---Custom time function override (for testing)
 ---@type fun():number|nil
 M.set_time_function = nil
@@ -49,33 +89,25 @@ function M.parse_iso_date(iso_string)
 		return nil
 	end
 
-	local days_in_month = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
-	local is_leap = (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0)
-	if is_leap then
-		days_in_month[2] = 29
-	end
+	local is_leap = is_leap_year(year)
+	local days_in_month = is_leap and DAYS_IN_MONTH_LEAP or DAYS_IN_MONTH
 
 	if month < 1 or month > 12 or day < 1 or day > days_in_month[month] then
 		return nil
 	end
 
 	local timestamp = 0
-	for y = 1970, year - 1 do
-		local is_leap_y = (y % 4 == 0 and y % 100 ~= 0) or (y % 400 == 0)
-		timestamp = timestamp + (is_leap_y and 366 or 365) * 86400
+	for y = EPOCH_YEAR, year - 1 do
+		timestamp = timestamp + get_days_in_year(y) * SECONDS_PER_DAY
 	end
 
 	for m = 1, month - 1 do
-		local days = days_in_month[m]
-		if m == 2 and is_leap then
-			days = 29
-		end
-		timestamp = timestamp + days * 86400
+		timestamp = timestamp + days_in_month[m] * SECONDS_PER_DAY
 	end
 
-	timestamp = timestamp + (day - 1) * 86400
-	timestamp = timestamp + hour * 3600
-	timestamp = timestamp + min * 60
+	timestamp = timestamp + (day - 1) * SECONDS_PER_DAY
+	timestamp = timestamp + hour * SECONDS_PER_HOUR
+	timestamp = timestamp + min * SECONDS_PER_MINUTE
 	timestamp = timestamp + sec
 
 	return timestamp
@@ -92,27 +124,17 @@ end
 ---@return number second (0-59)
 ---@return number weekday (1=Sunday, 7=Saturday)
 function M.timestamp_to_date(timestamp)
-	local days_since_epoch = math.floor(timestamp / 86400)
-	local seconds_in_day = timestamp % 86400
+	local days_since_epoch = math.floor(timestamp / SECONDS_PER_DAY)
+	local seconds_in_day = timestamp % SECONDS_PER_DAY
 
-	local year = 1970
-	local days_in_year = 365
-	local is_leap = (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0)
-	if is_leap then
-		days_in_year = 366
-	end
-
-	while days_since_epoch >= days_in_year do
-		days_since_epoch = days_since_epoch - days_in_year
+	local year = EPOCH_YEAR
+	while days_since_epoch >= get_days_in_year(year) do
+		days_since_epoch = days_since_epoch - get_days_in_year(year)
 		year = year + 1
-		is_leap = (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0)
-		days_in_year = is_leap and 366 or 365
 	end
 
-	local days_in_month = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
-	if is_leap then
-		days_in_month[2] = 29
-	end
+	local is_leap = is_leap_year(year)
+	local days_in_month = is_leap and DAYS_IN_MONTH_LEAP or DAYS_IN_MONTH
 
 	local month = 1
 	local day = days_since_epoch + 1
@@ -121,9 +143,9 @@ function M.timestamp_to_date(timestamp)
 		month = month + 1
 	end
 
-	local hour = math.floor(seconds_in_day / 3600)
-	local minute = math.floor((seconds_in_day % 3600) / 60)
-	local second = seconds_in_day % 60
+	local hour = math.floor(seconds_in_day / SECONDS_PER_HOUR)
+	local minute = math.floor((seconds_in_day % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE)
+	local second = seconds_in_day % SECONDS_PER_MINUTE
 
 	local weekday = ((days_since_epoch + 4) % 7) + 1
 
@@ -163,12 +185,10 @@ end
 ---@param month number
 ---@return number
 function M.get_days_in_month(year, month)
-	local days_in_month = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
-	local is_leap = (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0)
-	if is_leap and month == 2 then
-		return 29
+	if is_leap_year(year) and month == 2 then
+		return DAYS_IN_MONTH_LEAP[month]
 	end
-	return days_in_month[month] or 31
+	return DAYS_IN_MONTH[month] or 31
 end
 
 
@@ -176,16 +196,7 @@ end
 ---@param weekday_name string
 ---@return number|nil
 function M.weekday_to_number(weekday_name)
-	local weekdays = {
-		sun = 1, sunday = 1,
-		mon = 2, monday = 2,
-		tue = 3, tuesday = 3,
-		wed = 4, wednesday = 4,
-		thu = 5, thursday = 5,
-		fri = 6, friday = 6,
-		sat = 7, saturday = 7
-	}
-	return weekdays[weekday_name:lower()]
+	return WEEKDAY_TO_NUMBER[weekday_name:lower()]
 end
 
 
@@ -193,8 +204,7 @@ end
 ---@param weekday_number number
 ---@return string
 function M.number_to_weekday(weekday_number)
-	local weekdays = { "sun", "mon", "tue", "wed", "thu", "fri", "sat" }
-	return weekdays[weekday_number] or "sun"
+	return NUMBER_TO_WEEKDAY[weekday_number] or "sun"
 end
 
 

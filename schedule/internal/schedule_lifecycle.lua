@@ -72,6 +72,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_start(event_id, event_data)
+	logger:info("Lifecycle: on_start", { event_id = event_id, category = event_data.category })
 	local callback = M.get_callback(event_id, "on_start")
 	if callback and type(callback) == "function" then
 		M.call_callback(callback, event_data, "on_start")
@@ -83,6 +84,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_enabled(event_id, event_data)
+	logger:info("Lifecycle: on_enabled", { event_id = event_id, category = event_data.category })
 	local callback = M.get_callback(event_id, "on_enabled")
 	if callback and type(callback) == "function" then
 		M.call_callback(callback, event_data, "on_enabled")
@@ -94,6 +96,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_disabled(event_id, event_data)
+	logger:info("Lifecycle: on_disabled", { event_id = event_id, category = event_data.category })
 	local callback = M.get_callback(event_id, "on_disabled")
 	if callback and type(callback) == "function" then
 		M.call_callback(callback, event_data, "on_disabled")
@@ -105,6 +108,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_end(event_id, event_data)
+	logger:info("Lifecycle: on_end", { event_id = event_id, category = event_data.category })
 	local callback = M.get_callback(event_id, "on_end")
 	if callback and type(callback) == "function" then
 		M.call_callback(callback, event_data, "on_end")
@@ -117,6 +121,7 @@ end
 ---@param event_data table
 ---@return string|nil action "cancel", "abort", or nil
 function M.on_fail(event_id, event_data)
+	logger:info("Lifecycle: on_fail", { event_id = event_id, category = event_data.category })
 	local on_fail_value = M.get_callback(event_id, "on_fail")
 	if not on_fail_value then
 		return nil

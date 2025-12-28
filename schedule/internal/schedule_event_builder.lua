@@ -11,10 +11,13 @@ local M = {}
 
 
 ---Create a new event builder instance (internal - use schedule.event() instead).
+---@param id string|nil Unique identifier for the event for persistence, or nil to generate a random one
 ---@return schedule.event_builder New builder instance
-function M.create()
+function M.create(id)
 	local self = setmetatable({}, { __index = M })
-	self.config = {}
+	self.config = {
+		id = id,
+	}
 	return self
 end
 

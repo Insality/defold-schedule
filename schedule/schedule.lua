@@ -89,9 +89,10 @@ end
 ---Create a new event builder for scheduling timed events. Returns a builder with fluent API.
 ---Chain methods like `:category()`, `:after()`, `:duration()`, then call `:save()` to finalize.
 ---Nothing happens until `:save()` is called.
+---@param id string|nil Unique identifier for the event for persistence, or nil to generate a random one
 ---@return schedule.event_builder builder Builder instance for configuring and saving the event
-function M.event()
-	return event_builder.create()
+function M.event(id)
+	return event_builder.create(id)
 end
 
 

@@ -29,4 +29,8 @@ dependencies#1 = https://github.com/Insality/defold-event/archive/refs/tags/13.z
 dependencies#2 = https://github.com/britzl/deftest/archive/refs/tags/2.8.0.zip
 dependencies#3 = https://github.com/Insality/druid/archive/heads/develop.zip
 dependencies#4 = https://github.com/Insality/defold-saver/archive/refs/tags/5.zip
+dependencies#5 = https://github.com/Insality/defold-log/archive/refs/tags/6.zip
+
+[input]
+game_binding = /builtins/input/all.input_bindingc
 

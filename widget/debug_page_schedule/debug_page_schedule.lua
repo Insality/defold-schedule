@@ -235,85 +235,106 @@ function M.render_event_details_page(schedule, event_id, properties_panel)
 	-- Category
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("Category")
 		if event then
 			local category = event:get_category() or "none"
-			text:set_text_property("Category")
 			text:set_text_value(category)
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
 	-- Time to start
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("Time to Start")
 		if event then
 			local time_to_start = event:get_time_to_start()
 			if time_to_start > 0 then
-				text:set_text_property("Time to Start")
 				text:set_text_value(M.format_time(time_to_start))
+			else
+				text:set_text_value("Ready")
 			end
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
 	-- Time left
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("Time Left")
 		if event then
 			local status = event:get_status()
 			if status == "active" then
 				local time_left = event:get_time_left()
 				if time_left == -1 then
-					text:set_text_property("Time Left")
 					text:set_text_value("∞ (infinity)")
 				else
-					text:set_text_property("Time Left")
 					text:set_text_value(M.format_time(time_left))
 				end
+			else
+				text:set_text_value("N/A")
 			end
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
 	-- Start time
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("Start Time")
 		if event then
 			local event_state = event.state
 			if event_state.start_time then
-				text:set_text_property("Start Time")
 				text:set_text_value(M.format_timestamp(event_state.start_time))
+			else
+				text:set_text_value("N/A")
 			end
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
 	-- End time
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("End Time")
 		if event then
 			local event_state = event.state
 			if event_state.end_time then
-				text:set_text_property("End Time")
 				text:set_text_value(M.format_timestamp(event_state.end_time))
 			elseif event_state.infinity then
-				text:set_text_property("End Time")
 				text:set_text_value("∞ (infinity)")
+			else
+				text:set_text_value("N/A")
 			end
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
 	-- Duration
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("Duration")
 		if event then
 			local event_state = event.state
 			if event_state.duration then
-				text:set_text_property("Duration")
 				text:set_text_value(M.format_time(event_state.duration))
+			else
+				text:set_text_value("N/A")
 			end
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
 	-- Cycle information
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("Cycle")
 		if event then
 			local event_state = event.state
 			if event_state.cycle then
@@ -322,21 +343,28 @@ function M.render_event_details_page(schedule, event_id, properties_panel)
 				if event_state.cycle_count then
 					cycle_info = cycle_info .. " | Count: " .. event_state.cycle_count
 				end
-				text:set_text_property("Cycle")
 				text:set_text_value(cycle_info)
+			else
+				text:set_text_value("None")
 			end
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
 	-- Conditions
 	properties_panel:add_text(function(text)
 		local event = schedule.get(event_id)
+		text:set_text_property("Conditions")
 		if event then
 			local event_state = event.state
 			if event_state.conditions and #event_state.conditions > 0 then
-				text:set_text_property("Conditions")
 				text:set_text_value(tostring(#event_state.conditions) .. " condition(s)")
+			else
+				text:set_text_value("None")
 			end
+		else
+			text:set_text_value("N/A")
 		end
 	end)
 
