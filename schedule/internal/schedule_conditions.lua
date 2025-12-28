@@ -20,15 +20,15 @@ end
 
 
 ---Evaluate all conditions for an event
----@param event_config schedule.event_config
+---@param event_status schedule.event_status
 ---@return boolean all_passed
 ---@return string|nil failed_condition_name
-function M.evaluate_conditions(event_config)
-	if not event_config.conditions or #event_config.conditions == 0 then
+function M.evaluate_conditions(event_status)
+	if not event_status.conditions or #event_status.conditions == 0 then
 		return true, nil
 	end
 
-	for _, condition_data in ipairs(event_config.conditions) do
+	for _, condition_data in ipairs(event_status.conditions) do
 		local evaluator = conditions[condition_data.name]
 		if not evaluator then
 			logger:error("Condition not found", { name = condition_data.name })

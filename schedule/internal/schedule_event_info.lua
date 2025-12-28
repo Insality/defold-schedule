@@ -1,4 +1,3 @@
-local config = require("schedule.internal.schedule_config")
 local state = require("schedule.internal.schedule_state")
 local time_utils = require("schedule.internal.schedule_time")
 
@@ -19,10 +18,9 @@ local M = {}
 ---@param event_id string
 ---@return schedule.event_info|nil
 function M.create(event_id)
-	local event_config = config.get_event_config(event_id)
 	local event_status = state.get_event_status(event_id)
 
-	if not event_config and not event_status then
+	if not event_status then
 		return nil
 	end
 
@@ -32,13 +30,6 @@ function M.create(event_id)
 
 	setmetatable(event_info, { __index = M })
 	return event_info
-end
-
-
----Get event config (fresh)
----@return schedule.event_config|nil
-function M:_get_config()
-	return config.get_event_config(self.event_id)
 end
 
 
@@ -76,8 +67,8 @@ function M:get_time_left()
 	end
 
 	if status == "pending" then
-		if event_config and event_config.duration then
-			return event_config.duration
+		if event_status and event_status.duration then
+			return event_status.duration
 		end
 		if event_status and event_status.end_time and event_status.start_time then
 			return math.max(0, event_status.end_time - event_status.start_time)
@@ -121,22 +112,22 @@ end
 ---Get event payload
 ---@return any
 function M:get_payload()
-	local event_config = self:_get_config()
-	if not event_config then
+	local event_status = self:_get_status()
+	if not event_status then
 		return nil
 	end
-	return event_config.payload
+	return event_status.payload
 end
 
 
 ---Get event category
 ---@return string|nil
 function M:get_category()
-	local event_config = self:_get_config()
-	if not event_config then
+	local event_status = self:_get_status()
+	if not event_status then
 		return nil
 	end
-	return event_config.category
+	return event_status.category
 end
 
 

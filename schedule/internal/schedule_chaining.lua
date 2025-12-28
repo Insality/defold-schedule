@@ -1,5 +1,4 @@
 ---Event chaining logic
-local config = require("schedule.internal.schedule_config")
 local state = require("schedule.internal.schedule_state")
 local time_utils = require("schedule.internal.schedule_time")
 
@@ -9,18 +8,17 @@ local M = {}
 
 ---Check if event can start based on chaining
 ---@param after_event_id string Event ID to chain after
----@param event_config schedule.event_config
+---@param event_status schedule.event_status
 ---@param current_time number
 ---@return boolean can_start
 ---@return number|nil start_time Calculated start time if can start
-function M.can_start_chain(after_event_id, event_config, current_time)
+function M.can_start_chain(after_event_id, event_status, current_time)
 	if not after_event_id or type(after_event_id) ~= "string" then
 		return true, nil
 	end
 	local after_status = state.get_event_status(after_event_id)
-	local after_config = config.get_event_config(after_event_id)
 
-	if not after_status or not after_config then
+	if not after_status then
 		return false, nil
 	end
 
@@ -28,7 +26,7 @@ function M.can_start_chain(after_event_id, event_config, current_time)
 		return false, nil
 	end
 
-	local wait_online = event_config.after_options and event_config.after_options.wait_online
+	local wait_online = event_status.after_options and event_status.after_options.wait_online
 	if wait_online == false or wait_online == nil then
 		if after_status.end_time and current_time < after_status.end_time then
 			return false, nil

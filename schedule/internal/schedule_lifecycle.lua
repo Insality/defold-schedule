@@ -1,5 +1,6 @@
 ---Lifecycle callback management
 local logger = require("schedule.internal.schedule_logger")
+local callbacks = require("schedule.internal.schedule_callbacks")
 
 
 local M = {}
@@ -26,47 +27,59 @@ end
 
 
 ---Trigger on_start callback
----@param event_config schedule.event_config
+---@param event_id string
 ---@param event_data table
-function M.on_start(event_config, event_data)
-	M.call_callback(event_config.on_start, event_data, "on_start")
+function M.on_start(event_id, event_data)
+	local callback = callbacks.get_callback(event_id, "on_start")
+	if callback and type(callback) == "function" then
+		M.call_callback(callback, event_data, "on_start")
+	end
 end
 
 
 ---Trigger on_enabled callback
----@param event_config schedule.event_config
+---@param event_id string
 ---@param event_data table
-function M.on_enabled(event_config, event_data)
-	M.call_callback(event_config.on_enabled, event_data, "on_enabled")
+function M.on_enabled(event_id, event_data)
+	local callback = callbacks.get_callback(event_id, "on_enabled")
+	if callback and type(callback) == "function" then
+		M.call_callback(callback, event_data, "on_enabled")
+	end
 end
 
 
 ---Trigger on_disabled callback
----@param event_config schedule.event_config
+---@param event_id string
 ---@param event_data table
-function M.on_disabled(event_config, event_data)
-	M.call_callback(event_config.on_disabled, event_data, "on_disabled")
+function M.on_disabled(event_id, event_data)
+	local callback = callbacks.get_callback(event_id, "on_disabled")
+	if callback and type(callback) == "function" then
+		M.call_callback(callback, event_data, "on_disabled")
+	end
 end
 
 
 ---Trigger on_end callback
----@param event_config schedule.event_config
+---@param event_id string
 ---@param event_data table
-function M.on_end(event_config, event_data)
-	M.call_callback(event_config.on_end, event_data, "on_end")
+function M.on_end(event_id, event_data)
+	local callback = callbacks.get_callback(event_id, "on_end")
+	if callback and type(callback) == "function" then
+		M.call_callback(callback, event_data, "on_end")
+	end
 end
 
 
 ---Trigger on_fail callback
----@param event_config schedule.event_config
+---@param event_id string
 ---@param event_data table
 ---@return string|nil action "cancel", "abort", or nil
-function M.on_fail(event_config, event_data)
-	if not event_config.on_fail then
+function M.on_fail(event_id, event_data)
+	local on_fail_value = callbacks.get_callback(event_id, "on_fail")
+	if not on_fail_value then
 		return nil
 	end
 
-	local on_fail_value = event_config.on_fail
 	local on_fail_type = type(on_fail_value)
 
 	if on_fail_type == "string" then

@@ -20,8 +20,8 @@
 
 local queue = require("event.queue")
 local event_builder = require("schedule.internal.schedule_event_builder")
-local config = require("schedule.internal.schedule_config")
 local state = require("schedule.internal.schedule_state")
+local callbacks = require("schedule.internal.schedule_callbacks")
 local time_utils = require("schedule.internal.schedule_time")
 local processor = require("schedule.internal.schedule_processor")
 local conditions = require("schedule.internal.schedule_conditions")
@@ -48,7 +48,8 @@ M.WEEK = 604800
 ---Callback is fun(event: table): boolean|nil (return true to mark event as handled)
 ---@class schedule.queue.on_event: queue
 ---@field push fun(_, event: table)
----@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): boolean
+---@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): any
+---@field unsubscribe fun(_, subscription: any)
 M.on_event = queue.create()
 
 
@@ -63,7 +64,6 @@ local emitted_events = {}
 
 ---Initialize schedule system
 function M.init()
-	config.reset()
 	if not state.get_last_update_time() then
 		state.set_last_update_time(time_utils.get_time())
 	end
@@ -80,7 +80,7 @@ end
 ---Reset schedule state
 function M.reset_state()
 	state.reset()
-	config.reset()
+	callbacks.reset()
 	conditions.reset()
 	M.on_event:clear()
 	emitted_events = {}
@@ -88,22 +88,6 @@ function M.reset_state()
 	if M.timer_id then
 		timer.cancel(M.timer_id)
 		M.timer_id = nil
-	end
-end
-
-
----Initialize event status when event is created
-local function initialize_event_status(event_id)
-	local event_status = state.get_event_status(event_id)
-	if not event_status then
-		state.set_event_status(event_id, {
-			status = "pending",
-			start_time = nil,
-			end_time = nil,
-			last_update_time = nil,
-			cycle_count = 0,
-			next_cycle_time = nil
-		})
 	end
 end
 
@@ -141,23 +125,7 @@ end
 ---@param event_id string
 ---@return schedule.event_status|nil
 function M.get_status(event_id)
-	local event_status = state.get_event_status(event_id)
-	if not event_status then
-		return nil
-	end
-
-	local event_config = config.get_event_config(event_id)
-	if event_config then
-		local combined_status = {}
-		for k, v in pairs(event_status) do
-			combined_status[k] = v
-		end
-		combined_status.category = event_config.category
-		combined_status.payload = event_config.payload
-		return combined_status
-	end
-
-	return event_status
+	return state.get_event_status(event_id)
 end
 
 
@@ -175,23 +143,22 @@ function M.update()
 	local last_update_time = state.get_last_update_time() or current_time
 	local any_updated = processor.update_all(current_time, M.on_event)
 
-	local all_events = config.get_all_events()
-	for event_id, event_config in pairs(all_events) do
-		local event_status = state.get_event_status(event_id)
-		if event_status and event_status.status == "active" then
+	local all_events = state.get_all_events()
+	for event_id, event_status in pairs(all_events) do
+		if event_status.status == "active" then
 			local emit_key = event_id .. "_" .. (event_status.start_time or 0) .. "_" .. (event_status.cycle_count or 0)
 			if not emitted_events[emit_key] and event_status.start_time and current_time >= event_status.start_time then
 				emitted_events[emit_key] = true
 				M.on_event:push({
 					id = event_id,
-					category = event_config.category,
-					payload = event_config.payload,
+					category = event_status.category,
+					payload = event_status.payload,
 					status = event_status.status,
 					start_time = event_status.start_time,
 					end_time = event_status.end_time
 				})
 			end
-		elseif event_status and event_status.status ~= "active" then
+		elseif event_status.status ~= "active" then
 			local emit_key = event_id .. "_" .. (event_status.start_time or 0) .. "_" .. (event_status.cycle_count or 0)
 			emitted_events[emit_key] = nil
 		end
@@ -205,22 +172,18 @@ end
 ---@return table<string, schedule.event> Table mapping event_id -> event
 function M.filter(category, status)
 	local result = {}
-	local all_events = config.get_all_events()
+	local all_events = state.get_all_events()
 
-	for event_id, event_config in pairs(all_events) do
+	for event_id, event_status in pairs(all_events) do
 		local matches_category = true
 		local matches_status = true
 
 		if category ~= nil then
-			matches_category = (event_config.category == category)
+			matches_category = (event_status.category == category)
 		end
 
 		if status ~= nil then
-			local event_status_obj = state.get_event_status(event_id)
-			local event_status_str = "pending"
-			if event_status_obj then
-				event_status_str = event_status_obj.status or "pending"
-			end
+			local event_status_str = event_status.status or "pending"
 			matches_status = (event_status_str == status)
 		end
 

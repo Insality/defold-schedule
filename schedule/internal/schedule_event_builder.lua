@@ -1,11 +1,12 @@
-local config = require("schedule.internal.schedule_config")
+local state = require("schedule.internal.schedule_state")
+local callbacks = require("schedule.internal.schedule_callbacks")
 local logger = require("schedule.internal.schedule_logger")
 local event_class = require("schedule.internal.schedule_event")
 
 local event_id_counter = 0
 
----@class schedule.event_builder
----@field config schedule.event_config
+---@class schedule.event_builder : schedule.event
+---@field config table
 ---@field event_id string|nil
 local M = {}
 
@@ -198,42 +199,81 @@ end
 
 
 ---Save event and return event instance
----@return schedule.event_builder
+---@return schedule.event
 function M:save()
+	local time_utils = require("schedule.internal.schedule_time")
+	local current_time = time_utils.get_time()
+	
 	local event_id = nil
+	local existing_status = nil
+	
 	if self.config.id then
-		local existing_id = config.find_event_by_id(self.config.id)
+		local existing_id = state.find_by_persistent_id(self.config.id)
 		if existing_id then
 			event_id = existing_id
-			local existing_config = config.get_event_config(existing_id)
-			if existing_config then
-				if self.config.on_start then existing_config.on_start = self.config.on_start end
-				if self.config.on_enabled then existing_config.on_enabled = self.config.on_enabled end
-				if self.config.on_disabled then existing_config.on_disabled = self.config.on_disabled end
-				if self.config.on_end then existing_config.on_end = self.config.on_end end
-				if self.config.on_fail then existing_config.on_fail = self.config.on_fail end
-				config.set_event_config(event_id, existing_config)
-			end
+			existing_status = state.get_event_status(event_id)
 		else
 			event_id = self.config.id
-			if event_id then
-				config.set_event_config(event_id, self.config)
-			end
 		end
 	else
 		event_id_counter = event_id_counter + 1
 		event_id = "schedule_" .. event_id_counter
-		config.set_event_config(event_id, self.config)
 	end
 
 	assert(event_id ~= nil, "Event ID must be generated")
 
-	local state = require("schedule.internal.schedule_state")
-	local time_utils = require("schedule.internal.schedule_time")
+	if existing_status then
+		local calculated_start_time = existing_status.start_time
+		local calculated_end_time = existing_status.end_time
+		local initial_status = existing_status.status or "pending"
 
-	local existing_status = state.get_event_status(event_id)
-	if not existing_status then
-		local current_time = time_utils.get_time()
+		if self.config.start_at then
+			local start_at = self.config.start_at
+			if type(start_at) == "string" then
+				calculated_start_time = time_utils.parse_iso_date(start_at)
+			elseif type(start_at) == "number" then
+				calculated_start_time = start_at
+			end
+		elseif self.config.after then
+			local after = self.config.after
+			if type(after) == "number" then
+				calculated_start_time = current_time + after
+			end
+		end
+
+		if self.config.end_at then
+			local end_at = self.config.end_at
+			if type(end_at) == "string" then
+				calculated_end_time = time_utils.parse_iso_date(end_at)
+			elseif type(end_at) == "number" then
+				calculated_end_time = end_at
+			end
+		elseif self.config.duration and calculated_start_time then
+			calculated_end_time = calculated_start_time + self.config.duration
+		end
+
+		state.set_event_status(event_id, {
+			id = self.config.id,
+			status = initial_status,
+			start_time = calculated_start_time,
+			end_time = calculated_end_time,
+			last_update_time = existing_status.last_update_time,
+			cycle_count = existing_status.cycle_count or 0,
+			next_cycle_time = existing_status.next_cycle_time,
+			category = self.config.category or existing_status.category,
+			payload = self.config.payload or existing_status.payload,
+			after = self.config.after or existing_status.after,
+			after_options = self.config.after_options or existing_status.after_options,
+			start_at = self.config.start_at or existing_status.start_at,
+			end_at = self.config.end_at or existing_status.end_at,
+			duration = self.config.duration or existing_status.duration,
+			infinity = self.config.infinity ~= nil and self.config.infinity or existing_status.infinity,
+			cycle = self.config.cycle or existing_status.cycle,
+			conditions = self.config.conditions or existing_status.conditions,
+			catch_up = self.config.catch_up ~= nil and self.config.catch_up or existing_status.catch_up,
+			min_time = self.config.min_time or existing_status.min_time
+		})
+	else
 		local calculated_start_time = nil
 		local calculated_end_time = nil
 		local initial_status = "pending"
@@ -272,13 +312,42 @@ function M:save()
 		end
 
 		state.set_event_status(event_id, {
+			id = self.config.id,
 			status = initial_status,
 			start_time = calculated_start_time,
 			end_time = calculated_end_time,
 			last_update_time = nil,
 			cycle_count = 0,
-			next_cycle_time = nil
+			next_cycle_time = nil,
+			category = self.config.category,
+			payload = self.config.payload,
+			after = self.config.after,
+			after_options = self.config.after_options,
+			start_at = self.config.start_at,
+			end_at = self.config.end_at,
+			duration = self.config.duration,
+			infinity = self.config.infinity,
+			cycle = self.config.cycle,
+			conditions = self.config.conditions,
+			catch_up = self.config.catch_up,
+			min_time = self.config.min_time
 		})
+	end
+
+	if self.config.on_start then
+		callbacks.register_callback(event_id, "on_start", self.config.on_start)
+	end
+	if self.config.on_enabled then
+		callbacks.register_callback(event_id, "on_enabled", self.config.on_enabled)
+	end
+	if self.config.on_disabled then
+		callbacks.register_callback(event_id, "on_disabled", self.config.on_disabled)
+	end
+	if self.config.on_end then
+		callbacks.register_callback(event_id, "on_end", self.config.on_end)
+	end
+	if self.config.on_fail then
+		callbacks.register_callback(event_id, "on_fail", self.config.on_fail)
 	end
 
 	self.event_id = event_id

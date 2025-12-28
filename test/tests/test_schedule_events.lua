@@ -124,6 +124,7 @@ return function()
 
 		it("Should unsubscribe from events", function()
 			local call_count = 0
+			---@type any
 			local subscription = schedule.on_event:subscribe(function(event)
 				call_count = call_count + 1
 				return true
