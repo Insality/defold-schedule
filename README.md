@@ -48,8 +48,8 @@ https://github.com/Insality/defold-schedule/archive/refs/tags/1.zip
 
 | Platform         | Size          |
 | ---------------- | ------------- |
-| HTML5            | **1.68 KB**   |
-| Desktop / Mobile | **2.88 KB**   |
+| HTML5            | **14.71 KB**   |
+| Desktop / Mobile | **23.87 KB**   |
 
 
 ## API Reference

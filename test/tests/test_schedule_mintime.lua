@@ -15,17 +15,17 @@ return function()
 			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
-				:duration(86400)
-				:min_time(86400)
+				:duration(schedule.WEEK)
+				:min_time(schedule.DAY)
 				:save()
 
 			time = 50
 			schedule.update()
 			assert(event:get_status() == "pending", "Event should be pending before start_at")
 
-			time = 100
+			time = 100 + schedule.WEEK - schedule.DAY + 1
 			schedule.update()
-			assert(event:get_status() == "pending" or event:get_status() == "cancelled", "Event should not start if not enough time left")
+			assert(event:get_status() == "cancelled", "Event should be cancelled if remaining time is less than min_time")
 		end)
 
 
@@ -33,56 +33,70 @@ return function()
 			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
-				:duration(86400)
-				:min_time(86400)
+				:duration(schedule.WEEK)
+				:min_time(schedule.DAY)
 				:save()
 
 			time = 100
 			schedule.update()
-			assert(event ~= nil, "Status should exist")
+			assert(event:get_status() == "active", "Event should start if enough time left")
 		end)
 
 
 		it("Should handle min_time with duration events", function()
 			local event = schedule.event()
 				:category("liveops")
-				:after(60)
-				:duration(86400)
-				:min_time(86400)
+				:after(schedule.MINUTE)
+				:duration(schedule.WEEK)
+				:min_time(schedule.DAY)
 				:save()
 
-			time = 60
+			time = schedule.MINUTE
 			schedule.update()
-			assert(event ~= nil, "Status should exist")
+			assert(event:get_status() == "active", "Event should start with enough time remaining")
 		end)
 
 
 		it("Should handle min_time with cycle events", function()
 			local event = schedule.event()
 				:category("liveops")
-				:after(60)
-				:duration(86400)
-				:cycle("every", { seconds = 172800 })
-				:min_time(86400)
+				:after(schedule.MINUTE)
+				:duration(schedule.WEEK)
+				:cycle("every", { seconds = schedule.WEEK * 2 })
+				:min_time(schedule.DAY)
 				:save()
 
-			time = 60
+			time = schedule.MINUTE
 			schedule.update()
-			assert(event ~= nil, "Status should exist")
+			assert(event:get_status() == "active", "Event should start with enough time remaining")
 		end)
 
 
-		it("Should handle min_time edge cases", function()
+		it("Should cancel event when min_time equals duration", function()
 			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
-				:duration(100)
-				:min_time(100)
+				:duration(schedule.WEEK)
+				:min_time(schedule.WEEK)
 				:save()
 
 			time = 100
 			schedule.update()
-			assert(event ~= nil, "Status should exist with exact min_time")
+			assert(event:get_status() == "cancelled", "Event should be cancelled when min_time equals duration")
+		end)
+
+
+		it("Should cancel event when min_time exceeds duration", function()
+			local event = schedule.event()
+				:category("liveops")
+				:start_at(100)
+				:duration(schedule.WEEK)
+				:min_time(schedule.WEEK * 2)
+				:save()
+
+			time = 100
+			schedule.update()
+			assert(event:get_status() == "cancelled", "Event should be cancelled when min_time exceeds duration")
 		end)
 
 
@@ -90,13 +104,13 @@ return function()
 			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
-				:duration(1)
-				:min_time(1)
+				:duration(100 * schedule.SECOND)
+				:min_time(50 * schedule.SECOND)
 				:save()
 
 			time = 100
 			schedule.update()
-			assert(event ~= nil, "Status should exist")
+			assert(event:get_status() == "active", "Event should start when min_time is less than duration")
 		end)
 
 
@@ -105,12 +119,30 @@ return function()
 				:category("liveops")
 				:start_at(100)
 				:infinity()
-				:min_time(86400)
+				:min_time(schedule.DAY)
 				:save()
 
 			time = 100
 			schedule.update()
-			assert(event ~= nil, "Status should exist")
+			assert(event:get_status() == "active", "Infinity event should start regardless of min_time")
+		end)
+
+
+		it("Should handle min_time with typical week-long event", function()
+			local event = schedule.event()
+				:category("liveops")
+				:start_at(1000)
+				:duration(schedule.WEEK)
+				:min_time(schedule.DAY)
+				:save()
+
+			time = 1000
+			schedule.update()
+			assert(event:get_status() == "active", "Week-long event should start with one day min_time")
+
+			time = 1000 + schedule.WEEK - schedule.DAY
+			schedule.update()
+			assert(event:get_status() == "active", "Event should still be active with exactly min_time remaining")
 		end)
 	end)
 end

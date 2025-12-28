@@ -11,12 +11,8 @@ local M = {}
 
 ---Create event instance
 ---@param event_state schedule.event.state
----@return schedule.event|nil event Event instance or nil if event_state is invalid
+---@return schedule.event|nil event Event instance
 function M.create(event_state)
-	if not event_state then
-		return nil
-	end
-
 	local self = setmetatable({}, { __index = M })
 	self.state = event_state
 	return self
