@@ -1,5 +1,5 @@
 local state = require("schedule.internal.schedule_state")
-local callbacks = require("schedule.internal.schedule_callbacks")
+local lifecycle = require("schedule.internal.schedule_lifecycle")
 local logger = require("schedule.internal.schedule_logger")
 local event_class = require("schedule.internal.schedule_event")
 
@@ -335,41 +335,44 @@ function M:save()
 	end
 
 	if self.config.on_start then
-		callbacks.register_callback(event_id, "on_start", self.config.on_start)
+		lifecycle.register_callback(event_id, "on_start", self.config.on_start)
 	end
 	if self.config.on_enabled then
-		callbacks.register_callback(event_id, "on_enabled", self.config.on_enabled)
+		lifecycle.register_callback(event_id, "on_enabled", self.config.on_enabled)
 	end
 	if self.config.on_disabled then
-		callbacks.register_callback(event_id, "on_disabled", self.config.on_disabled)
+		lifecycle.register_callback(event_id, "on_disabled", self.config.on_disabled)
 	end
 	if self.config.on_end then
-		callbacks.register_callback(event_id, "on_end", self.config.on_end)
+		lifecycle.register_callback(event_id, "on_end", self.config.on_end)
 	end
 	if self.config.on_fail then
-		callbacks.register_callback(event_id, "on_fail", self.config.on_fail)
+		lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
 	end
 
 	self.event_id = event_id
 
-	local event_instance = event_class.create(event_id)
-	if event_instance then
-		setmetatable(self, {
-			__index = function(t, k)
-				if M[k] then
-					return M[k]
-				end
-				local method = event_instance[k]
-				if method and type(method) == "function" then
-					return function(...)
-						local args = {...}
-						args[1] = event_instance
-						return method(unpack(args))
+	local event_status = state.get_event_status(event_id)
+	if event_status then
+		local event_instance = event_class.create(event_status)
+		if event_instance then
+			setmetatable(self, {
+				__index = function(t, k)
+					if M[k] then
+						return M[k]
 					end
+					local method = event_instance[k]
+					if method and type(method) == "function" then
+						return function(...)
+							local args = {...}
+							args[1] = event_instance
+							return method(unpack(args))
+						end
+					end
+					return method
 				end
-				return method
-			end
-		})
+			})
+		end
 	end
 
 	logger:debug("Event saved", { event_id = event_id, category = self.config.category })

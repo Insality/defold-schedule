@@ -1,49 +1,36 @@
-local state = require("schedule.internal.schedule_state")
 local time_utils = require("schedule.internal.schedule_time")
 
 
 ---@class schedule.event
----@field event_id string
+---@field event_status schedule.event_status
 local M = {}
 
 
 ---Create event instance
----@param event_id string
+---@param event_status schedule.event_status
 ---@return schedule.event|nil
-function M.create(event_id)
-	local event_status = state.get_event_status(event_id)
+function M.create(event_status)
 	if not event_status then
 		return nil
 	end
 
 	local self = setmetatable({}, { __index = M })
-	self.event_id = event_id
+	self.event_status = event_status
 	return self
 end
 
 
 ---Get event ID
----@return string
+---@return string|nil
 function M:get_id()
-	return self.event_id
-end
-
-
----Get event status (fresh)
----@return schedule.event_status|nil
-function M:_get_status()
-	return state.get_event_status(self.event_id)
+	return self.event_status.event_id
 end
 
 
 ---Get event status
 ---@return string
 function M:get_status()
-	local event_status = self:_get_status()
-	if not event_status then
-		return "pending"
-	end
-	return event_status.status or "pending"
+	return self.event_status.status or "pending"
 end
 
 
@@ -52,31 +39,26 @@ end
 function M:get_time_left()
 	local status = self:get_status()
 	local current_time = time_utils.get_time()
-	local event_status = self:_get_status()
-
-	if not event_status then
-		return 0
-	end
 
 	if status == "completed" then
-		if not event_status.end_time then
+		if not self.event_status.end_time then
 			return 0
 		end
-		return math.max(0, event_status.end_time - current_time)
+		return math.max(0, self.event_status.end_time - current_time)
 	end
 
 	if status == "pending" then
-		if event_status.end_time and event_status.start_time then
-			return math.max(0, event_status.end_time - event_status.start_time)
+		if self.event_status.end_time and self.event_status.start_time then
+			return math.max(0, self.event_status.end_time - self.event_status.start_time)
 		end
 		return 0
 	end
 
 	if status == "active" then
-		if not event_status.end_time then
+		if not self.event_status.end_time then
 			return 0
 		end
-		return math.max(0, event_status.end_time - current_time)
+		return math.max(0, self.event_status.end_time - current_time)
 	end
 
 	return 0
@@ -88,17 +70,16 @@ end
 function M:get_time_to_start()
 	local status = self:get_status()
 	local current_time = time_utils.get_time()
-	local event_status = self:_get_status()
 
 	if status == "completed" then
 		return 0
 	end
 
 	if status == "pending" or status == "active" then
-		if not event_status or not event_status.start_time then
+		if not self.event_status.start_time then
 			return 0
 		end
-		return math.max(0, event_status.start_time - current_time)
+		return math.max(0, self.event_status.start_time - current_time)
 	end
 
 	return 0
@@ -108,33 +89,21 @@ end
 ---Get event payload
 ---@return any
 function M:get_payload()
-	local event_status = self:_get_status()
-	if not event_status then
-		return nil
-	end
-	return event_status.payload
+	return self.event_status.payload
 end
 
 
 ---Get event category
 ---@return string|nil
 function M:get_category()
-	local event_status = self:_get_status()
-	if not event_status then
-		return nil
-	end
-	return event_status.category
+	return self.event_status.category
 end
 
 
 ---Get event start time
 ---@return number|nil
 function M:get_start_time()
-	local event_status = self:_get_status()
-	if not event_status then
-		return nil
-	end
-	return event_status.start_time
+	return self.event_status.start_time
 end
 
 

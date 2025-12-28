@@ -14,6 +14,7 @@
 ---@field data any
 
 ---@class schedule.event_status
+---@field event_id string|nil Event ID (key in state table)
 ---@field id string|nil Persistent event ID
 ---@field status "pending"|"active"|"completed"|"cancelled"|"aborted"|"failed"
 ---@field start_time number|nil
@@ -87,6 +88,7 @@ end
 ---@param event_id string
 ---@param status schedule.event_status
 function M.set_event_status(event_id, status)
+	status.event_id = event_id
 	state.events[event_id] = status
 end
 

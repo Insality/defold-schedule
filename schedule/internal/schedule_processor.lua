@@ -1,6 +1,5 @@
 ---Event processor - main update loop
 local state = require("schedule.internal.schedule_state")
-local callbacks = require("schedule.internal.schedule_callbacks")
 local time_utils = require("schedule.internal.schedule_time")
 local cycles = require("schedule.internal.schedule_cycles")
 local conditions = require("schedule.internal.schedule_conditions")

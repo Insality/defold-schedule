@@ -21,12 +21,11 @@
 local queue = require("event.queue")
 local event_builder = require("schedule.internal.schedule_event_builder")
 local state = require("schedule.internal.schedule_state")
-local callbacks = require("schedule.internal.schedule_callbacks")
+local lifecycle = require("schedule.internal.schedule_lifecycle")
 local time_utils = require("schedule.internal.schedule_time")
 local processor = require("schedule.internal.schedule_processor")
 local conditions = require("schedule.internal.schedule_conditions")
 local logger = require("schedule.internal.schedule_logger")
-local event_info = require("schedule.internal.schedule_event_info")
 local event_class = require("schedule.internal.schedule_event")
 
 
@@ -80,7 +79,7 @@ end
 ---Reset schedule state
 function M.reset_state()
 	state.reset()
-	callbacks.reset()
+	lifecycle.reset_callbacks()
 	conditions.reset()
 	M.on_event:clear()
 	emitted_events = {}
@@ -117,7 +116,11 @@ end
 ---@param event_id string
 ---@return schedule.event|nil
 function M.get(event_id)
-	return event_class.create(event_id)
+	local event_status = state.get_event_status(event_id)
+	if not event_status then
+		return nil
+	end
+	return event_class.create(event_status)
 end
 
 
@@ -188,7 +191,7 @@ function M.filter(category, status)
 		end
 
 		if matches_category and matches_status then
-			local event = event_class.create(event_id)
+			local event = event_class.create(event_status)
 			if event then
 				result[event_id] = event
 			end
