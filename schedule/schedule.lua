@@ -163,7 +163,7 @@ end
 function M.update()
 	local current_time = time_utils.get_time()
 	local last_update_time = state.get_last_update_time() or current_time
-	local any_updated = processor.update_all(current_time)
+	local any_updated = processor.update_all(current_time, M.on_event)
 
 	local all_events = config.get_all_events()
 	for event_id, event_config in pairs(all_events) do

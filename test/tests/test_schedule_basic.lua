@@ -8,16 +8,16 @@ return function()
 			mock_time_value = time
 		end
 
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule_time.get_time = function()
-			return mock_time_value
-		end
-		schedule.reset_state()
-		schedule.init()
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule_time.get_time = function()
+				return mock_time_value
+			end
+			schedule.reset_state()
+			schedule.init()
 
-		mock_time_value = 0
-	end)
+			mock_time_value = 0
+		end)
 
 		after(function()
 			schedule.update()
@@ -171,6 +171,11 @@ return function()
 			assert(schedule.get_status(event2).status == "pending")
 
 			set_time(150)
+			schedule.update()
+			assert(schedule.get_status(event1).status == "active")
+			assert(schedule.get_status(event2).status == "active")
+
+			set_time(180)
 			schedule.update()
 			assert(schedule.get_status(event1).status == "completed")
 			assert(schedule.get_status(event2).status == "active")
