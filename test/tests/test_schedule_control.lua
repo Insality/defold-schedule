@@ -177,7 +177,7 @@ return function()
 			schedule.update()
 			assert(event:get_status() == "completed", "Event should be completed")
 
-			local success = schedule.cancel(event:get_id())
+			local success = event:cancel()
 			assert(not success, "cancel() should return false for completed event")
 			assert(event:get_status() == "completed", "Event should remain completed")
 		end)
@@ -209,7 +209,7 @@ return function()
 
 			assert(event:get_status() == "pending", "Event should be pending")
 
-			local success = schedule.pause(event:get_id())
+			local success = event:pause()
 			assert(not success, "pause() should return false for pending event")
 			assert(event:get_status() == "pending", "Event should remain pending")
 		end)
@@ -247,7 +247,7 @@ return function()
 			schedule.update()
 			assert(event:get_status() == "active", "Event should be active")
 
-			local success = schedule.resume(event:get_id())
+			local success = event:resume()
 			assert(not success, "resume() should return false for active event")
 			assert(event:get_status() == "active", "Event should remain active")
 		end)
@@ -284,20 +284,25 @@ return function()
 
 
 		it("Should handle control methods on non-existent events gracefully", function()
-			local success = schedule.finish("non_existent")
-			assert(not success, "finish() should return false for non-existent event")
+			local event = schedule.get("non_existent")
+			assert(event == nil, "Non-existent event should return nil")
 
-			success = schedule.start("non_existent")
-			assert(not success, "start() should return false for non-existent event")
+			if event then
+				local success = event:finish()
+				assert(not success, "finish() should return false for non-existent event")
 
-			success = schedule.cancel("non_existent")
-			assert(not success, "cancel() should return false for non-existent event")
+				success = event:start()
+				assert(not success, "start() should return false for non-existent event")
 
-			success = schedule.pause("non_existent")
-			assert(not success, "pause() should return false for non-existent event")
+				success = event:cancel()
+				assert(not success, "cancel() should return false for non-existent event")
 
-			success = schedule.resume("non_existent")
-			assert(not success, "resume() should return false for non-existent event")
+				success = event:pause()
+				assert(not success, "pause() should return false for non-existent event")
+
+				success = event:resume()
+				assert(not success, "resume() should return false for non-existent event")
+			end
 		end)
 
 

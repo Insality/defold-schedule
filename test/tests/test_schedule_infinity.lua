@@ -149,6 +149,9 @@ return function()
 				:infinity()
 				:save()
 
+			schedule.update()
+			assert(event1:get_status() == "active", "First event should be active")
+
 			time = 10
 			schedule.update()
 			assert(event1:get_status() == "completed", "First event should be completed")

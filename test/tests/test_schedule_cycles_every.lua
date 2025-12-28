@@ -150,6 +150,71 @@ return function()
 			schedule.update()
 			assert(event:get_status() == "active", "Third cycle")
 		end)
+
+
+		it("Should limit catch-up cycles with max_catches", function()
+			local cycle_count = 0
+			local event = schedule.event()
+				:category("reward")
+				:after(60)
+				:duration(10)
+				:cycle("every", { seconds = 100, skip_missed = false, max_catches = 3 })
+				:catch_up(true)
+				:on_start(function()
+					cycle_count = cycle_count + 1
+				end)
+				:save()
+
+			time = 60
+			schedule.update()
+			assert(cycle_count == 1, "First cycle should trigger")
+			assert(event:get_status() == "active", "Event should be active")
+
+			time = 70
+			schedule.update()
+			assert(event:get_status() == "completed", "Event should complete")
+
+			time = 1000
+			schedule.update()
+			assert(cycle_count <= 4, "Should only catch up max_catches cycles (1 initial + 3 catch-up = 4 max)")
+			assert(cycle_count >= 3, "Should catch up at least some cycles")
+		end)
+
+
+		it("Should increment cycle_count on each cycle activation", function()
+			local event = schedule.event()
+				:category("reward")
+				:after(60)
+				:duration(10)
+				:cycle("every", { seconds = 100 })
+				:save()
+
+			time = 60
+			schedule.update()
+			local status1 = schedule.get_status(event:get_id())
+			assert(status1 ~= nil, "Status should exist")
+			assert(status1.cycle_count == 0 or status1.cycle_count == nil, "Initial cycle_count should be 0 or nil")
+
+			time = 70
+			schedule.update()
+			assert(event:get_status() == "completed", "Event should complete")
+
+			time = 160
+			schedule.update()
+			local status2 = schedule.get_status(event:get_id())
+			assert(status2 ~= nil, "Status should exist")
+			assert(status2.cycle_count == 1, "cycle_count should increment to 1 after second cycle")
+
+			time = 170
+			schedule.update()
+			assert(event:get_status() == "completed", "Event should complete again")
+
+			time = 260
+			schedule.update()
+			local status3 = schedule.get_status(event:get_id())
+			assert(status3 ~= nil, "Status should exist")
+			assert(status3.cycle_count == 2, "cycle_count should increment to 2 after third cycle")
+		end)
 	end)
 end
 
