@@ -2,10 +2,18 @@
 local M = {}
 
 
+---Custom time function override (for testing)
+---@type fun():number|nil
+M.set_time_function = nil
+
+
 ---Get current time in seconds
 ---Override this to use custom time source
 ---@return number
 function M.get_time()
+	if M.set_time_function then
+		return M.set_time_function()
+	end
 	return socket.gettime()
 end
 

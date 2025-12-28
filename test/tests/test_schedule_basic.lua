@@ -82,7 +82,7 @@ return function()
 
 			time = 15
 			schedule.update()
-			assert(event_info:get_status() == "completed", "Event should be completed")
+			assert(event_info:get_status() == "active", "Event should be active")
 			assert(event_info:get_time_to_start() == 0, "Event should have 0 seconds to start")
 			assert(event_info:get_time_left() == 5, "Event should have 5 seconds left")
 
@@ -113,7 +113,7 @@ return function()
 
 			time = 100
 			schedule.update()
-			assert(event_info:get_status() == "active", "Event should be active")
+			assert(event_info:get_status() == "pending", "Event should be pending")
 			assert(event_info:get_time_to_start() == 50, "Event should have 50 seconds to start")
 			assert(event_info:get_time_left() == 0, "Event should have 0 seconds left")
 
@@ -331,7 +331,7 @@ return function()
 
 			schedule.update()
 			local pending_events = schedule.filter(nil, "pending")
-			assert(length(pending_events) == 2, "Should have 2 pending event")
+			assert(length(pending_events) == 1, "Should have 1 pending event")
 
 			time = 15
 			schedule.update()

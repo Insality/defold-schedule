@@ -234,6 +234,8 @@ function M:save()
 	if not existing_status then
 		local current_time = time_utils.get_time()
 		local calculated_start_time = nil
+		local calculated_end_time = nil
+		local initial_status = "pending"
 
 		if self.config.start_at then
 			local start_at = self.config.start_at
@@ -251,10 +253,27 @@ function M:save()
 			calculated_start_time = current_time
 		end
 
+		if self.config.end_at then
+			local end_at = self.config.end_at
+			if type(end_at) == "string" then
+				calculated_end_time = time_utils.parse_iso_date(end_at)
+			elseif type(end_at) == "number" then
+				calculated_end_time = end_at
+			end
+		elseif self.config.duration and calculated_start_time then
+			calculated_end_time = calculated_start_time + self.config.duration
+		end
+
+		if self.config.end_at and not self.config.start_at and not self.config.after then
+			if calculated_start_time and current_time >= calculated_start_time and calculated_end_time and current_time < calculated_end_time then
+				initial_status = "active"
+			end
+		end
+
 		state.set_event_status(event_id, {
-			status = "pending",
+			status = initial_status,
 			start_time = calculated_start_time,
-			end_time = nil,
+			end_time = calculated_end_time,
 			last_update_time = nil,
 			cycle_count = 0,
 			next_cycle_time = nil

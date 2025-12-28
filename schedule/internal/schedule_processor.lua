@@ -554,6 +554,22 @@ function M.update_event(event_id, event_config, current_time, last_update_time, 
 
 				lifecycle.on_start(event_config, { id = event_id, category = event_config.category, payload = event_config.payload })
 				lifecycle.on_enabled(event_config, { id = event_id, category = event_config.category, payload = event_config.payload })
+
+				if not end_time and not event_config.infinity then
+					event_status.status = "completed"
+					event_status.last_update_time = current_time
+					state.set_event_status(event_id, event_status)
+
+					lifecycle.on_end(event_config, { id = event_id, category = event_config.category, payload = event_config.payload })
+					lifecycle.on_disabled(event_config, { id = event_id, category = event_config.category, payload = event_config.payload })
+
+					if event_config.cycle then
+						M.process_cycle(event_id, event_config, current_time, event_queue)
+					end
+
+					return true
+				end
+
 				return true
 			elseif event_status.status == "cancelled" or event_status.status == "aborted" or event_status.status == "failed" then
 				local all_conditions_passed, failed_condition = conditions.evaluate_conditions(event_config)

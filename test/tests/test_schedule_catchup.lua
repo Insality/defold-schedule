@@ -19,6 +19,7 @@ return function()
 				:category("reward")
 				:after(60)
 				:duration(1)
+				:cycle("every", { seconds = 100, skip_missed = false })
 				:on_start(function()
 					count = count + 1
 				end)
