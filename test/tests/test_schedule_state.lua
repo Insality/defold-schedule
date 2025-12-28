@@ -2,21 +2,14 @@ return function()
 	describe("Schedule State", function()
 		local schedule ---@type schedule
 		local schedule_time = require("schedule.internal.schedule_time")
-		local mock_time_value = 0
-
-		local function set_time(time)
-			mock_time_value = time
-		end
+		local time = 0
 
 	before(function()
 		schedule = require("schedule.schedule")
-		schedule_time.get_time = function()
-			return mock_time_value
-		end
+		schedule_time.set_time_function = function() return time end
 		schedule.reset_state()
 		schedule.init()
-
-		mock_time_value = 0
+		time = 0
 	end)
 
 		after(function()
@@ -30,7 +23,7 @@ return function()
 				:duration(120)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 
 			local state = schedule.get_state()
@@ -42,8 +35,8 @@ return function()
 			schedule.set_state(state)
 			schedule.init()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist after state restore")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist after state restore")
 		end)
 
 
@@ -57,8 +50,8 @@ return function()
 			schedule.reset_state()
 			schedule.init()
 
-			local status = schedule.get_status(event_id)
-			assert(status == nil, "Status should not exist after reset")
+			local event_info = schedule.get(event_id)
+			assert(event_info == nil, "Status should not exist after reset")
 		end)
 
 
@@ -69,7 +62,7 @@ return function()
 				:duration(120)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 
 			local state = schedule.get_state()
@@ -86,8 +79,8 @@ return function()
 				schedule.set_state(saved_state)
 				schedule.init()
 
-				local status = schedule.get_status(event_id)
-				assert(status ~= nil, "Status should exist after state restore")
+				local event_info = schedule.get(event_id)
+				assert(event_info ~= nil, "Status should exist after state restore")
 			end
 		end)
 
@@ -105,7 +98,7 @@ return function()
 				:duration(200)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 
 			local state = schedule.get_state()
@@ -122,10 +115,10 @@ return function()
 				schedule.set_state(saved_state)
 				schedule.init()
 
-				local status1 = schedule.get_status(event1)
-				local status2 = schedule.get_status(event2)
-				assert(status1 ~= nil, "First event status should exist")
-				assert(status2 ~= nil, "Second event status should exist")
+				local event_info1 = schedule.get(event1)
+				local event_info2 = schedule.get(event2)
+				assert(event_info1 ~= nil, "First event status should exist")
+				assert(event_info2 ~= nil, "Second event status should exist")
 			end
 		end)
 
@@ -141,7 +134,7 @@ return function()
 				table.insert(event_ids, event_id)
 			end
 
-			set_time(300)
+			time =300)
 			schedule.update()
 
 			local state = schedule.get_state()
@@ -151,8 +144,8 @@ return function()
 			schedule.init()
 
 			for _, event_id in ipairs(event_ids) do
-				local status = schedule.get_status(event_id)
-				assert(status ~= nil, "Status should exist for event " .. event_id)
+				local event_info = schedule.get(event_id)
+				assert(event_info ~= nil, "Status should exist for event " .. event_id)
 			end
 		end)
 	end)

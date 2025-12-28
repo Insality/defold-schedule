@@ -2,21 +2,14 @@ return function()
 	describe("Schedule Cycles Every", function()
 		local schedule ---@type schedule
 		local schedule_time = require("schedule.internal.schedule_time")
-		local mock_time_value = 0
-
-		local function set_time(time)
-			mock_time_value = time
-		end
+		local time = 0
 
 	before(function()
 		schedule = require("schedule.schedule")
-		schedule_time.get_time = function()
-			return mock_time_value
-		end
+		schedule_time.set_time_function = function() return time end
 		schedule.reset_state()
 		schedule.init()
-
-		mock_time_value = 0
+		time = 0
 	end)
 
 		after(function()
@@ -31,20 +24,20 @@ return function()
 				:cycle("every", { seconds = 120 })
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
-			local status = schedule.get_status(event_id)
-			assert(status.status == "active", "Event should be active at first trigger")
+			local event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "active", "Event should be active at first trigger")
 
-			set_time(61)
+			time =61)
 			schedule.update()
-			status = schedule.get_status(event_id)
-			assert(status.status == "completed", "Event should complete after duration")
+			event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "completed", "Event should complete after duration")
 
-			set_time(180)
+			time =180)
 			schedule.update()
-			status = schedule.get_status(event_id)
-			assert(status.status == "active", "Event should cycle and be active again")
+			event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "active", "Event should cycle and be active again")
 		end)
 
 
@@ -56,17 +49,17 @@ return function()
 				:cycle("every", { seconds = 100, anchor = "start" })
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active")
+			assert(schedule.get(event_id):get_status() == "active")
 
-			set_time(90)
+			time =90)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "completed")
+			assert(schedule.get(event_id):get_status() == "completed")
 
-			set_time(160)
+			time =160)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active", "Should cycle from start anchor")
+			assert(schedule.get(event_id):get_status() == "active", "Should cycle from start anchor")
 		end)
 
 
@@ -78,17 +71,17 @@ return function()
 				:cycle("every", { seconds = 100, anchor = "end" })
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active")
+			assert(schedule.get(event_id):get_status() == "active")
 
-			set_time(90)
+			time =90)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "completed")
+			assert(schedule.get(event_id):get_status() == "completed")
 
-			set_time(190)
+			time =190)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active", "Should cycle from end anchor")
+			assert(schedule.get(event_id):get_status() == "active", "Should cycle from end anchor")
 		end)
 
 
@@ -100,14 +93,14 @@ return function()
 				:cycle("every", { seconds = 100, skip_missed = true })
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active")
+			assert(schedule.get(event_id):get_status() == "active")
 
-			set_time(1000)
+			time =1000)
 			schedule.update()
-			local status = schedule.get_status(event_id)
-			assert(status.status == "active" or status.status == "completed", "Should skip to current cycle")
+			local event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "active" or event_info:get_status() == "completed", "Should skip to current cycle")
 		end)
 
 
@@ -128,11 +121,11 @@ return function()
 				return true
 			end)
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(trigger_count == 1, "First trigger")
 
-			set_time(1000)
+			time =1000)
 			schedule.update()
 			assert(trigger_count > 1, "Should catch up missed cycles")
 		end)
@@ -146,25 +139,25 @@ return function()
 				:cycle("every", { seconds = 100 })
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active")
+			assert(schedule.get(event_id):get_status() == "active")
 
-			set_time(70)
+			time =70)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "completed")
+			assert(schedule.get(event_id):get_status() == "completed")
 
-			set_time(160)
+			time =160)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active", "Second cycle")
+			assert(schedule.get(event_id):get_status() == "active", "Second cycle")
 
-			set_time(170)
+			time =170)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "completed", "Second cycle completed")
+			assert(schedule.get(event_id):get_status() == "completed", "Second cycle completed")
 
-			set_time(260)
+			time =260)
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active", "Third cycle")
+			assert(schedule.get(event_id):get_status() == "active", "Third cycle")
 		end)
 	end)
 end

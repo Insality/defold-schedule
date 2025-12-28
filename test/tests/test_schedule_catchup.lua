@@ -2,25 +2,14 @@ return function()
 	describe("Schedule Catchup", function()
 		local schedule ---@type schedule
 		local schedule_time = require("schedule.internal.schedule_time")
-		local mock_time_value = 0
+		local time = 0
 
-		local function set_time(time)
-			mock_time_value = time
-		end
-
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule_time.get_time = function()
-			return mock_time_value
-		end
-		schedule.reset_state()
-		schedule.init()
-
-		mock_time_value = 0
-	end)
-
-		after(function()
-			schedule.update()
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule_time.set_time_function = function() return time end
+			schedule.reset_state()
+			schedule.init()
+			time = 0
 		end)
 
 		it("Should catch up missed events when catch_up is true", function()
@@ -36,17 +25,17 @@ return function()
 				:catch_up(true)
 				:save()
 
-			set_time(60)
+			time = 60
 			schedule.update()
 			assert(count == 1, "on_start should be called")
-			local status = schedule.get_status(event_id)
-			assert(status.status == "active", "Event should be active")
+			local event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "active", "Event should be active")
 
-			set_time(1000)
+			time = 1000
 			schedule.update()
 			assert(count > 10, "on_start should be called multiple times")
-			status = schedule.get_status(event_id)
-			assert(status.status == "completed", "Event should be completed after catch up")
+			event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "completed", "Event should be completed after catch up")
 		end)
 
 
@@ -66,11 +55,11 @@ return function()
 				:catch_up(false)
 				:save()
 
-			set_time(60)
+			time = 60
 			schedule.update()
 			local initial_count = trigger_count
 
-			set_time(1000)
+			time = 1000
 			schedule.update()
 			assert(trigger_count == initial_count, "Should not catch up missed events")
 		end)
@@ -84,11 +73,11 @@ return function()
 				:catch_up(true)
 				:save()
 
-			set_time(1000)
+			time = 1000
 			schedule.update()
 
-			local status = schedule.get_status(event_id)
-			assert(status.status == "completed", "Event should be completed after catch up")
+			local event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "completed", "Event should be completed after catch up")
 		end)
 
 
@@ -109,11 +98,11 @@ return function()
 				:catch_up(true)
 				:save()
 
-			set_time(60)
+			time = 60
 			schedule.update()
 			assert(trigger_count == 1, "First trigger")
 
-			set_time(1000)
+			time = 1000
 			schedule.update()
 			assert(trigger_count > 1, "Should catch up missed cycles")
 		end)
@@ -127,14 +116,14 @@ return function()
 				:catch_up(true)
 				:save()
 
-			set_time(60)
+			time = 60
 			schedule.update()
-			assert(schedule.get_status(event_id).status == "active", "Event should be active")
+			assert(schedule.get(event_id):get_status() == "active", "Event should be active")
 
-			set_time(10000)
+			time = 10000
 			schedule.update()
-			local status = schedule.get_status(event_id)
-			assert(status.status == "completed", "Event should complete after offline period")
+			local event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "completed", "Event should complete after offline period")
 		end)
 
 
@@ -145,11 +134,11 @@ return function()
 				:duration(120)
 				:save()
 
-			set_time(1000)
+			time = 1000
 			schedule.update()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 
 
@@ -159,11 +148,11 @@ return function()
 				:after(60)
 				:save()
 
-			set_time(1000)
+			time = 1000
 			schedule.update()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 	end)
 end

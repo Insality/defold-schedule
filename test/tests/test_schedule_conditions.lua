@@ -2,25 +2,14 @@ return function()
 	describe("Schedule Conditions", function()
 		local schedule ---@type schedule
 		local schedule_time = require("schedule.internal.schedule_time")
-		local mock_time_value = 0
+		local time = 0
 
-		local function set_time(time)
-			mock_time_value = time
-		end
-
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule_time.get_time = function()
-			return mock_time_value
-		end
-		schedule.reset_state()
-		schedule.init()
-
-		mock_time_value = 0
-	end)
-
-		after(function()
-			schedule.update()
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule_time.set_time_function = function() return time end
+			schedule.reset_state()
+			schedule.init()
+			time = 0
 		end)
 
 		it("Should register condition", function()
@@ -54,8 +43,8 @@ return function()
 				:condition("has_level", { level = 5 })
 				:save()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 
 
@@ -72,8 +61,8 @@ return function()
 				:condition("has_token", { token_id = "level", amount = 4 })
 				:save()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 
 
@@ -94,12 +83,12 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(fail_called, "on_fail callback should be called")
 
-			local status = schedule.get_status(event_id)
-			assert(status.status == "cancelled" or status.status == "failed", "Event should be cancelled or failed")
+			local event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "cancelled" or event_info:get_status() == "failed", "Event should be cancelled or failed")
 		end)
 
 
@@ -120,12 +109,12 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(fail_called, "on_fail callback should be called")
 
-			local status = schedule.get_status(event_id)
-			assert(status.status == "aborted" or status.status == "failed", "Event should be aborted or failed")
+			local event_info = schedule.get(event_id)
+			assert(event_info:get_status() == "aborted" or event_info:get_status() == "failed", "Event should be aborted or failed")
 		end)
 
 
@@ -142,15 +131,15 @@ return function()
 				:condition("dynamic_condition", {})
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
-			local status = schedule.get_status(event_id)
-			local initial_status = status.status
+			local event_info = schedule.get(event_id)
+			local initial_status = event_info:get_status()
 
 			condition_value = true
 			schedule.update()
-			status = schedule.get_status(event_id)
-			assert(status.status ~= initial_status or status.status == "active", "Status should change when condition becomes true")
+			event_info = schedule.get(event_id)
+			assert(event_info:get_status() ~= initial_status or event_info:get_status() == "active", "Status should change when condition becomes true")
 		end)
 	end)
 end

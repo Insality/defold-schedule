@@ -59,8 +59,8 @@ return function()
 
 			assert(not warn_called, "Warn should not be called yet")
 
-			local status = schedule.get_status("non_existing_event")
-			assert(status == nil, "Status should be nil for non-existing event")
+			local event_info = schedule.get("non_existing_event")
+			assert(event_info == nil, "Status should be nil for non-existing event")
 		end)
 
 
@@ -93,8 +93,8 @@ return function()
 				:duration(120)
 				:save()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist even without logger")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist even without logger")
 		end)
 
 

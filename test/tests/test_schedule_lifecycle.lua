@@ -2,21 +2,14 @@ return function()
 	describe("Schedule Lifecycle", function()
 		local schedule ---@type schedule
 		local schedule_time = require("schedule.internal.schedule_time")
-		local mock_time_value = 0
-
-		local function set_time(time)
-			mock_time_value = time
-		end
+		local time = 0
 
 	before(function()
 		schedule = require("schedule.schedule")
-		schedule_time.get_time = function()
-			return mock_time_value
-		end
+		schedule_time.set_time_function = function() return time end
 		schedule.reset_state()
 		schedule.init()
-
-		mock_time_value = 0
+		time = 0
 	end)
 
 		after(function()
@@ -37,7 +30,7 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(start_called, "on_start should be called")
 			assert(start_event ~= nil, "Event should be passed to callback")
@@ -59,7 +52,7 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(enabled_called, "on_enabled should be called")
 			assert(enabled_event ~= nil, "Event should be passed to callback")
@@ -80,11 +73,11 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(not disabled_called, "on_disabled should not be called yet")
 
-			set_time(180)
+			time =180)
 			schedule.update()
 			assert(disabled_called, "on_disabled should be called when event ends")
 			assert(disabled_event ~= nil, "Event should be passed to callback")
@@ -105,11 +98,11 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(not end_called, "on_end should not be called yet")
 
-			set_time(180)
+			time =180)
 			schedule.update()
 			assert(end_called, "on_end should be called when event ends")
 			assert(end_event ~= nil, "Event should be passed to callback")
@@ -135,7 +128,7 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(fail_called, "on_fail should be called when condition fails")
 			assert(fail_event ~= nil, "Event should be passed to callback")
@@ -163,12 +156,12 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(callback_order[1] == "start" or callback_order[1] == "enabled", "Start or enabled should be called first")
 			assert(callback_order[2] == "start" or callback_order[2] == "enabled", "Start or enabled should be called second")
 
-			set_time(180)
+			time =180)
 			schedule.update()
 			assert(callback_order[3] == "end" or callback_order[3] == "disabled", "End or disabled should be called third")
 			assert(callback_order[4] == "end" or callback_order[4] == "disabled", "End or disabled should be called fourth")
@@ -189,7 +182,7 @@ return function()
 				end)
 				:save()
 
-			set_time(60)
+			time =60)
 			schedule.update()
 			assert(start_called, "on_start should be called for persistent event")
 
@@ -206,7 +199,7 @@ return function()
 				end)
 				:save()
 
-			set_time(120)
+			time =120)
 			schedule.update()
 			assert(start_called, "on_start should be called for same persistent event")
 		end)

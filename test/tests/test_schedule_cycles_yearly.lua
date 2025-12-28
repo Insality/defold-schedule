@@ -2,21 +2,14 @@ return function()
 	describe("Schedule Cycles Yearly", function()
 		local schedule ---@type schedule
 		local schedule_time = require("schedule.internal.schedule_time")
-		local mock_time_value = 0
-
-		local function set_time(time)
-			mock_time_value = time
-		end
+		local time = 0
 
 	before(function()
 		schedule = require("schedule.schedule")
-		schedule_time.get_time = function()
-			return mock_time_value
-		end
+		schedule_time.set_time_function = function() return time end
 		schedule.reset_state()
 		schedule.init()
-
-		mock_time_value = 0
+		time = 0
 	end)
 
 		after(function()
@@ -30,8 +23,8 @@ return function()
 				:duration(86400)
 				:save()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 
 
@@ -42,8 +35,8 @@ return function()
 				:duration(3600)
 				:save()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 
 
@@ -54,8 +47,8 @@ return function()
 				:duration(86400)
 				:save()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 
 
@@ -82,8 +75,8 @@ return function()
 					:duration(86400)
 					:save()
 
-				local status = schedule.get_status(event_id)
-				assert(status ~= nil, "Status should exist for month " .. test_case.month .. " day " .. test_case.day)
+				local event_info = schedule.get(event_id)
+				assert(event_info ~= nil, "Status should exist for month " .. test_case.month .. " day " .. test_case.day)
 			end
 		end)
 
@@ -95,8 +88,8 @@ return function()
 				:duration(86400)
 				:save()
 
-			local status = schedule.get_status(event_id)
-			assert(status ~= nil, "Status should exist")
+			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Status should exist")
 		end)
 
 
@@ -108,8 +101,8 @@ return function()
 					:duration(86400)
 					:save()
 
-				local status = schedule.get_status(event_id)
-				assert(status ~= nil, "Status should exist for month " .. month)
+				local event_info = schedule.get(event_id)
+				assert(event_info ~= nil, "Status should exist for month " .. month)
 			end
 		end)
 	end)
