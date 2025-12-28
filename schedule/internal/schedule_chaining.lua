@@ -1,7 +1,5 @@
 ---Event chaining logic
 local state = require("schedule.internal.schedule_state")
-local time_utils = require("schedule.internal.schedule_time")
-
 
 local M = {}
 

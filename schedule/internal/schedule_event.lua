@@ -1,4 +1,4 @@
-local time_utils = require("schedule.internal.schedule_time")
+local time = require("schedule.internal.schedule_time")
 local state = require("schedule.internal.schedule_state")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
 local processor = require("schedule.internal.schedule_processor")
@@ -35,7 +35,7 @@ end
 ---@return number time_left Returns -1 for infinity events, 0 for completed events, or remaining seconds
 function M:get_time_left()
 	local status = self:get_status()
-	local current_time = time_utils.get_time()
+	local current_time = time.get_time()
 
 	if self.state.infinity and status == "active" then
 		return -1
@@ -73,7 +73,7 @@ end
 ---@return number time_to_start Time in seconds until event starts
 function M:get_time_to_start()
 	local status = self:get_status()
-	local current_time = time_utils.get_time()
+	local current_time = time.get_time()
 
 	if status == "completed" then
 		return 0
@@ -124,7 +124,7 @@ function M:finish()
 	if not event_status then
 		return false
 	end
-	local current_time = time_utils.get_time()
+	local current_time = time.get_time()
 	local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
 
 	if event_status.status == "pending" or event_status.status == "cancelled" or event_status.status == "aborted" or event_status.status == "failed" or event_status.status == "paused" then
@@ -171,7 +171,7 @@ function M:start()
 		return false
 	end
 
-	local current_time = time_utils.get_time()
+	local current_time = time.get_time()
 	if not event_status.start_time then
 		event_status.start_time = current_time
 	end
@@ -214,7 +214,7 @@ function M:cancel()
 	end
 
 	event_status.status = "cancelled"
-	event_status.last_update_time = time_utils.get_time()
+	event_status.last_update_time = time.get_time()
 	state.set_event_state(event_id, event_status)
 	self.state = event_status
 
@@ -241,7 +241,7 @@ function M:pause()
 	end
 
 	event_status.status = "paused"
-	event_status.last_update_time = time_utils.get_time()
+	event_status.last_update_time = time.get_time()
 	state.set_event_state(event_id, event_status)
 	self.state = event_status
 
@@ -268,7 +268,7 @@ function M:resume()
 	end
 
 	event_status.status = "active"
-	event_status.last_update_time = time_utils.get_time()
+	event_status.last_update_time = time.get_time()
 	state.set_event_state(event_id, event_status)
 	self.state = event_status
 

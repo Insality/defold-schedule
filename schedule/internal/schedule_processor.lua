@@ -1,12 +1,10 @@
 ---Event processor - main update loop
 local state = require("schedule.internal.schedule_state")
-local time_utils = require("schedule.internal.schedule_time")
+local time = require("schedule.internal.schedule_time")
 local cycles = require("schedule.internal.schedule_cycles")
 local conditions = require("schedule.internal.schedule_conditions")
 local chaining = require("schedule.internal.schedule_chaining")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
-local logger = require("schedule.internal.schedule_logger")
-
 
 local M = {}
 
@@ -19,7 +17,7 @@ function M.calculate_start_time(event_status, current_time)
 	if event_status.start_at then
 		local start_at = event_status.start_at
 		if type(start_at) == "string" then
-			return time_utils.parse_iso_date(start_at)
+			return time.parse_iso_date(start_at)
 		elseif type(start_at) == "number" then
 			return start_at
 		end
@@ -53,7 +51,7 @@ function M.calculate_end_time(event_status, start_time)
 	if event_status.end_at then
 		local end_at = event_status.end_at
 		if type(end_at) == "string" then
-			return time_utils.parse_iso_date(end_at)
+			return time.parse_iso_date(end_at)
 		elseif type(end_at) == "number" then
 			return end_at
 		end

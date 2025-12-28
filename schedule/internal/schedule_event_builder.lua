@@ -2,6 +2,7 @@ local state = require("schedule.internal.schedule_state")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
 local logger = require("schedule.internal.schedule_logger")
 local event = require("schedule.internal.schedule_event")
+local time_utils = require("schedule.internal.schedule_time")
 
 local event_id_counter = 0
 
@@ -229,7 +230,6 @@ end
 ---Returns the builder instance, which also acts as an event object with methods like `get_time_left()`, `get_status()`.
 ---@return schedule.event Event instance (builder also acts as event object)
 function M:save()
-	local time_utils = require("schedule.internal.schedule_time")
 	local current_time = time_utils.get_time()
 
 	local event_id = nil

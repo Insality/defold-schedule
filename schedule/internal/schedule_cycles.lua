@@ -1,6 +1,5 @@
 ---Cycle calculations for recurring events
-local time_utils = require("schedule.internal.schedule_time")
-
+local time = require("schedule.internal.schedule_time")
 
 local M = {}
 
@@ -52,8 +51,8 @@ function M.calculate_next_weekly(cycle_config, current_time, anchor_time)
 		return nil
 	end
 
-	local current_year, current_month, current_day, current_hour, current_minute, current_second, current_weekday = time_utils.timestamp_to_date(current_time)
-	local target_hour, target_minute, target_second = time_utils.parse_time_string(cycle_config.time or "00:00")
+	local current_year, current_month, current_day, current_hour, current_minute, current_second, current_weekday = time.timestamp_to_date(current_time)
+	local target_hour, target_minute, target_second = time.parse_time_string(cycle_config.time or "00:00")
 	if not target_hour then
 		target_hour = 0
 		target_minute = 0
@@ -62,7 +61,7 @@ function M.calculate_next_weekly(cycle_config, current_time, anchor_time)
 
 	local target_weekdays = {}
 	for _, weekday_name in ipairs(cycle_config.weekdays) do
-		local weekday_num = time_utils.weekday_to_number(weekday_name)
+		local weekday_num = time.weekday_to_number(weekday_name)
 		if weekday_num then
 			table.insert(target_weekdays, weekday_num)
 		end
@@ -82,8 +81,8 @@ function M.calculate_next_weekly(cycle_config, current_time, anchor_time)
 		for _, target_weekday in ipairs(target_weekdays) do
 			if check_weekday == target_weekday then
 				local candidate_time = current_time + (check_day * 86400)
-				local candidate_year, candidate_month, candidate_day = time_utils.timestamp_to_date(candidate_time)
-				local target_timestamp = time_utils.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
+				local candidate_year, candidate_month, candidate_day = time.timestamp_to_date(candidate_time)
+				local target_timestamp = time.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
 					candidate_year, candidate_month, candidate_day, target_hour, target_minute, target_second))
 
 				if target_timestamp and target_timestamp >= current_time then
@@ -104,21 +103,21 @@ end
 ---@return number|nil next_cycle_time
 function M.calculate_next_monthly(cycle_config, current_time, anchor_time)
 	local target_day = cycle_config.day or 1
-	local target_hour, target_minute, target_second = time_utils.parse_time_string(cycle_config.time or "00:00")
+	local target_hour, target_minute, target_second = time.parse_time_string(cycle_config.time or "00:00")
 	if not target_hour then
 		target_hour = 0
 		target_minute = 0
 		target_second = 0
 	end
 
-	local current_year, current_month, current_day = time_utils.timestamp_to_date(current_time)
-	local days_in_current_month = time_utils.get_days_in_month(current_year, current_month)
+	local current_year, current_month, current_day = time.timestamp_to_date(current_time)
+	local days_in_current_month = time.get_days_in_month(current_year, current_month)
 
 	if target_day > days_in_current_month then
 		target_day = days_in_current_month
 	end
 
-	local candidate_time = time_utils.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
+	local candidate_time = time.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
 		current_year, current_month, target_day, target_hour, target_minute, target_second))
 
 	if candidate_time and candidate_time >= current_time then
@@ -131,13 +130,13 @@ function M.calculate_next_monthly(cycle_config, current_time, anchor_time)
 		current_year = current_year + 1
 	end
 
-	local days_in_next_month = time_utils.get_days_in_month(current_year, current_month)
+	local days_in_next_month = time.get_days_in_month(current_year, current_month)
 	local final_day = target_day
 	if final_day > days_in_next_month then
 		final_day = days_in_next_month
 	end
 
-	return time_utils.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
+	return time.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
 		current_year, current_month, final_day, target_hour, target_minute, target_second))
 end
 
@@ -150,27 +149,27 @@ end
 function M.calculate_next_yearly(cycle_config, current_time, anchor_time)
 	local target_month = cycle_config.month or 1
 	local target_day = cycle_config.day or 1
-	local target_hour, target_minute, target_second = time_utils.parse_time_string(cycle_config.time or "00:00")
+	local target_hour, target_minute, target_second = time.parse_time_string(cycle_config.time or "00:00")
 	if not target_hour then
 		target_hour = 0
 		target_minute = 0
 		target_second = 0
 	end
 
-	local current_year, current_month, current_day = time_utils.timestamp_to_date(current_time)
+	local current_year, current_month, current_day = time.timestamp_to_date(current_time)
 
 	local candidate_year = current_year
 	if current_month > target_month or (current_month == target_month and current_day >= target_day) then
 		candidate_year = current_year + 1
 	end
 
-	local days_in_target_month = time_utils.get_days_in_month(candidate_year, target_month)
+	local days_in_target_month = time.get_days_in_month(candidate_year, target_month)
 	local final_day = target_day
 	if final_day > days_in_target_month then
 		final_day = days_in_target_month
 	end
 
-	return time_utils.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
+	return time.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
 		candidate_year, target_month, final_day, target_hour, target_minute, target_second))
 end
 

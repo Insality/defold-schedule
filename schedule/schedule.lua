@@ -25,7 +25,7 @@ local queue = require("event.queue")
 local event_builder = require("schedule.internal.schedule_event_builder")
 local state = require("schedule.internal.schedule_state")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
-local time_utils = require("schedule.internal.schedule_time")
+local time = require("schedule.internal.schedule_time")
 local processor = require("schedule.internal.schedule_processor")
 local conditions = require("schedule.internal.schedule_conditions")
 local logger = require("schedule.internal.schedule_logger")
@@ -67,7 +67,7 @@ function M.reset_state()
 	conditions.reset()
 	M.on_event:clear()
 	emitted_events = {}
-	time_utils.set_time_function(nil)
+	time.set_time_function(nil)
 end
 
 
@@ -132,7 +132,7 @@ end
 ---Update the schedule system. Call this at your desired refresh rate (e.g., in your game loop or timer callback).
 ---Processes all events, handles time progression, and triggers lifecycle callbacks. Initializes time tracking on first call.
 function M.update()
-	local current_time = time_utils.get_time()
+	local current_time = time.get_time()
 	if not state.get_last_update_time() then
 		state.set_last_update_time(current_time)
 	end

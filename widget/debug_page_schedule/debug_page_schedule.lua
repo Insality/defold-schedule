@@ -1,5 +1,5 @@
 local schedule = require("schedule.schedule")
-local time_utils = require("schedule.internal.schedule_time")
+local time = require("schedule.internal.schedule_time")
 
 local M = {}
 
@@ -30,7 +30,7 @@ function M.format_timestamp(timestamp)
 	if not timestamp then
 		return ""
 	end
-	local year, month, day, hour, minute, second = time_utils.timestamp_to_date(timestamp)
+	local year, month, day, hour, minute, second = time.timestamp_to_date(timestamp)
 	return string.format("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second)
 end
 
@@ -104,7 +104,7 @@ function M.render_properties_panel(druid, properties_panel)
 			local events = state.events or {}
 			local status_counts = M.count_events_by_status(events)
 			local count = status_counts[status_config.name] or 0
-			
+
 			button:set_text_property(status_config.label)
 			button:set_text_button(tostring(count))
 			button.button.on_click:subscribe(function()
@@ -165,20 +165,20 @@ function M.render_status_page(schedule, status, status_label, properties_panel)
 				gui.set_enabled(button.root, false)
 				return
 			end
-			
+
 			local event_state = event.state
 			local current_status = event_state.status or "pending"
-			
+
 			-- Only show this button if it matches current status
 			if current_status ~= status then
 				gui.set_enabled(button.root, false)
 				return
 			end
-			
+
 			local time_info = ""
 			local time_left = event:get_time_left()
 			local time_to_start = event:get_time_to_start()
-			
+
 			if current_status == "active" then
 				if time_left == -1 then
 					time_info = " ∞"
