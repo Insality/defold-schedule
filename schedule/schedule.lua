@@ -26,6 +26,7 @@ local time_utils = require("schedule.internal.schedule_time")
 local processor = require("schedule.internal.schedule_processor")
 local conditions = require("schedule.internal.schedule_conditions")
 local logger = require("schedule.internal.schedule_logger")
+local event_info = require("schedule.internal.schedule_event_info")
 
 
 ---@class schedule
@@ -121,14 +122,21 @@ end
 
 
 ---Create new event builder
----@param id string|nil Persistent event ID
 ---@return schedule.event_builder
-function M.event(id)
+function M.event()
 	return event_builder.create()
 end
 
 
----Get event status
+---Get event info object
+---@param event_id string
+---@return schedule.event_info|nil
+function M.get(event_id)
+	return event_info.create(event_id)
+end
+
+
+---Get event status (legacy function, kept for backward compatibility)
 ---@param event_id string
 ---@return schedule.event_status|nil
 function M.get_status(event_id)
@@ -187,6 +195,43 @@ function M.update()
 			emitted_events[emit_key] = nil
 		end
 	end
+end
+
+
+---Filter events by category and/or status
+---@param category string|nil Category to filter by, nil for any category
+---@param status string|nil Status to filter by, nil for any status
+---@return table<string, schedule.event_info> Table mapping event_id -> event_info
+function M.filter(category, status)
+	local result = {}
+	local all_events = config.get_all_events()
+
+	for event_id, event_config in pairs(all_events) do
+		local matches_category = true
+		local matches_status = true
+
+		if category ~= nil then
+			matches_category = (event_config.category == category)
+		end
+
+		if status ~= nil then
+			local event_status_obj = state.get_event_status(event_id)
+			local event_status_str = "pending"
+			if event_status_obj then
+				event_status_str = event_status_obj.status or "pending"
+			end
+			matches_status = (event_status_str == status)
+		end
+
+		if matches_category and matches_status then
+			local info = event_info.create(event_id)
+			if info then
+				result[event_id] = info
+			end
+		end
+	end
+
+	return result
 end
 
 
