@@ -72,7 +72,7 @@ end
 ---@param current_time number
 ---@return boolean should_start True if event should start, false otherwise
 function M.should_start_event(event_id, event_status, current_time)
-	if event_status.status ~= "pending" and event_status.status ~= "cancelled" and event_status.status ~= "aborted" and event_status.status ~= "failed" then
+	if not M._is_startable_status(event_status.status) then
 		return false
 	end
 
@@ -99,11 +99,10 @@ function M.should_start_event(event_id, event_status, current_time)
 
 	local all_conditions_passed, failed_condition = conditions.evaluate_conditions(event_status)
 	if not all_conditions_passed then
-		local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
+		local event_data = M._create_event_data(event_id, event_status)
 		local fail_action = lifecycle.on_fail(event_id, event_data)
 		if fail_action == "cancel" then
-			event_status.status = "cancelled"
-			state.set_event_state(event_id, event_status)
+			M._cancel_event(event_id, event_status)
 		elseif fail_action == "abort" then
 			event_status.status = "aborted"
 			state.set_event_state(event_id, event_status)
@@ -119,8 +118,7 @@ function M.should_start_event(event_id, event_status, current_time)
 		if end_time then
 			local remaining = end_time - current_time
 			if remaining <= event_status.min_time then
-				event_status.status = "cancelled"
-				state.set_event_state(event_id, event_status)
+				M._cancel_event(event_id, event_status)
 				return false
 			end
 		end
@@ -148,12 +146,6 @@ function M.process_catchup(event_id, event_status, last_update_time, current_tim
 			if not event_status.cycle then
 				local end_time = M.calculate_end_time(event_status, start_time)
 				if end_time and current_time >= end_time then
-					event_status.status = "completed"
-					event_status.start_time = start_time
-					event_status.end_time = end_time
-					event_status.last_update_time = current_time
-					state.set_event_state(event_id, event_status)
-
 					if event_queue then
 						event_queue:push({
 							id = event_id,
@@ -164,151 +156,35 @@ function M.process_catchup(event_id, event_status, last_update_time, current_tim
 							end_time = end_time
 						})
 					end
-
-					local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-					lifecycle.on_start(event_id, event_data)
-					lifecycle.on_enabled(event_id, event_data)
-					lifecycle.on_end(event_id, event_data)
-					lifecycle.on_disabled(event_id, event_data)
+					local event_data = M._create_event_data(event_id, event_status)
+					M._trigger_event_cycle(event_id, event_data)
+					event_status.status = "completed"
+					event_status.start_time = start_time
+					event_status.end_time = end_time
+					event_status.last_update_time = current_time
+					state.set_event_state(event_id, event_status)
 					return true
 				end
 			else
-				if not event_status.cycle.skip_missed then
-					local processed_cycles = {}
-					local cycle_start = start_time
-					local max_catches = event_status.cycle.max_catches
-					local catch_count = 0
-					while cycle_start and cycle_start <= current_time do
-						if max_catches and catch_count >= max_catches then
-							break
-						end
-						local cycle_end = M.calculate_end_time(event_status, cycle_start)
-						if cycle_end and cycle_end <= current_time then
-							table.insert(processed_cycles, { start = cycle_start, end_time = cycle_end })
-							catch_count = catch_count + 1
-							local next_cycle = cycles.calculate_next_cycle(
-								event_status.cycle,
-								current_time,
-								cycle_end,
-								start_time
-							)
-							if next_cycle then
-								cycle_start = next_cycle
-							else
-								break
-							end
-						else
-							break
-						end
+				local skip_missed = event_status.cycle.skip_missed or false
+				local processed_cycles, catch_count = M._collect_missed_cycles(event_status, start_time, current_time, skip_missed)
+
+				if #processed_cycles > 0 then
+					for i, cycle_data in ipairs(processed_cycles) do
+						M._apply_catchup_cycle(event_id, event_status, cycle_data.start, cycle_data.end_time, current_time, event_queue)
 					end
 
-					if #processed_cycles > 0 then
-						for i, cycle_data in ipairs(processed_cycles) do
-							event_status.status = "active"
-							event_status.start_time = cycle_data.start
-							event_status.end_time = cycle_data.end_time
-							event_status.cycle_count = (event_status.cycle_count or 0) + 1
-							event_status.last_update_time = current_time
-							state.set_event_state(event_id, event_status)
-
-							if event_queue then
-								event_queue:push({
-									id = event_id,
-									category = event_status.category,
-									payload = event_status.payload,
-									status = event_status.status,
-									start_time = event_status.start_time,
-									end_time = event_status.end_time
-								})
-							end
-
-							local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-							lifecycle.on_start(event_id, event_data)
-							lifecycle.on_enabled(event_id, event_data)
-							lifecycle.on_end(event_id, event_data)
-							lifecycle.on_disabled(event_id, event_data)
-						end
-
-						local last_cycle_start = processed_cycles[#processed_cycles].start
-						local final_end = processed_cycles[#processed_cycles].end_time
-						if final_end and current_time >= final_end then
-							event_status.status = "completed"
-							event_status.start_time = last_cycle_start
-							event_status.end_time = final_end
-							event_status.last_update_time = current_time
-							state.set_event_state(event_id, event_status)
-							return true
-						else
-							event_status.status = "active"
-							event_status.start_time = last_cycle_start
-							event_status.end_time = final_end
-							event_status.last_update_time = current_time
-							state.set_event_state(event_id, event_status)
-							return true
-						end
-					end
-				else
-					local processed_count = 0
-					local cycle_start = start_time
-					local max_catches = event_status.cycle.max_catches
-					while cycle_start and cycle_start <= current_time do
-						if max_catches and processed_count >= max_catches then
-							break
-						end
-						local cycle_end = M.calculate_end_time(event_status, cycle_start)
-						if cycle_end and cycle_end <= current_time then
-							processed_count = processed_count + 1
-							local next_cycle = cycles.calculate_next_cycle(
-								event_status.cycle,
-								current_time,
-								cycle_end,
-								start_time
-							)
-							if next_cycle then
-								cycle_start = next_cycle
-							else
-								break
-							end
-						else
-							break
-						end
-					end
-
-					if processed_count > 0 then
-						local last_cycle_start = start_time
-						for i = 1, processed_count - 1 do
-							local cycle_end = M.calculate_end_time(event_status, last_cycle_start)
-							if cycle_end then
-								local next_cycle = cycles.calculate_next_cycle(
-									event_status.cycle,
-									current_time,
-									cycle_end,
-									start_time
-								)
-								if next_cycle then
-									last_cycle_start = next_cycle
-								else
-									break
-								end
-							else
-								break
-							end
-						end
-
-						local final_end = M.calculate_end_time(event_status, last_cycle_start)
-						if final_end and current_time >= final_end then
-							event_status.status = "completed"
-							event_status.start_time = last_cycle_start
-							event_status.end_time = final_end
-							event_status.last_update_time = current_time
-							state.set_event_state(event_id, event_status)
-							local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-							lifecycle.on_start(event_id, event_data)
-							lifecycle.on_enabled(event_id, event_data)
-							lifecycle.on_end(event_id, event_data)
-							lifecycle.on_disabled(event_id, event_data)
-							return true
-						end
+					local last_cycle = processed_cycles[#processed_cycles]
+					if last_cycle.end_time and current_time >= last_cycle.end_time then
+						M._complete_event(event_id, event_status, last_cycle.start, last_cycle.end_time, current_time)
+						return true
+					else
+						event_status.status = "active"
+						event_status.start_time = last_cycle.start
+						event_status.end_time = last_cycle.end_time
+						event_status.last_update_time = current_time
+						state.set_event_state(event_id, event_status)
+						return true
 					end
 				end
 			end
@@ -318,12 +194,7 @@ function M.process_catchup(event_id, event_status, last_update_time, current_tim
 	if event_status.status == "active" then
 		local end_time = event_status.end_time
 		if end_time and current_time >= end_time then
-			event_status.status = "completed"
-			event_status.last_update_time = current_time
-			state.set_event_state(event_id, event_status)
-			local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-			lifecycle.on_end(event_id, event_data)
-			lifecycle.on_disabled(event_id, event_data)
+			M._complete_event(event_id, event_status, nil, end_time, current_time)
 			return true
 		end
 	end
@@ -406,39 +277,20 @@ function M.process_cycle(event_id, event_status, current_time, event_queue)
 								})
 							end
 
-							local all_events = state.get_all_events()
-							for chained_event_id, chained_event_status in pairs(all_events) do
-								if type(chained_event_status.after) == "string" and chained_event_status.after == event_id then
-									if chained_event_status.status == "pending" or chained_event_status.status == "completed" then
-										chained_event_status.start_time = nil
-										chained_event_status.status = "pending"
-										state.set_event_state(chained_event_id, chained_event_status)
-									end
-								end
-							end
+							M._update_chained_events(event_id)
 
-							local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-							lifecycle.on_start(event_id, event_data)
-							lifecycle.on_enabled(event_id, event_data)
+							local event_data = M._create_event_data(event_id, event_status)
+							M._trigger_event_start(event_id, event_data)
 
 							if current_time >= new_end_time then
-								event_status.status = "completed"
-								event_status.last_update_time = current_time
-								state.set_event_state(event_id, event_status)
-								lifecycle.on_end(event_id, event_data)
-								lifecycle.on_disabled(event_id, event_data)
+								M._complete_event(event_id, event_status, new_start_time, new_end_time, current_time)
 							end
 						end
 					end
 				end
 
-				if next_cycle_time and next_cycle_time > current_time then
-					event_status.next_cycle_time = next_cycle_time
-					state.set_event_state(event_id, event_status)
-				else
-					event_status.next_cycle_time = nil
-					state.set_event_state(event_id, event_status)
-				end
+				event_status.next_cycle_time = (next_cycle_time and next_cycle_time > current_time) and next_cycle_time or nil
+				state.set_event_state(event_id, event_status)
 
 				return true
 			end
@@ -494,20 +346,10 @@ function M.process_cycle(event_id, event_status, current_time, event_queue)
 				event_status.next_cycle_time = nil
 				state.set_event_state(event_id, event_status)
 
-				local all_events = state.get_all_events()
-				for chained_event_id, chained_event_status in pairs(all_events) do
-					if type(chained_event_status.after) == "string" and chained_event_status.after == event_id then
-						if chained_event_status.status == "pending" or chained_event_status.status == "completed" then
-							chained_event_status.start_time = nil
-							chained_event_status.status = "pending"
-							state.set_event_state(chained_event_id, chained_event_status)
-						end
-					end
-				end
+				M._update_chained_events(event_id)
 
-				local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-				lifecycle.on_start(event_id, event_data)
-				lifecycle.on_enabled(event_id, event_data)
+				local event_data = M._create_event_data(event_id, event_status)
+				M._trigger_event_start(event_id, event_data)
 				return true
 			end
 		end
@@ -535,7 +377,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 		return false
 	end
 
-	if event_status.status == "pending" or event_status.status == "cancelled" or event_status.status == "aborted" or event_status.status == "failed" or event_status.status == "paused" then
+	if M._is_startable_status(event_status.status) or event_status.status == "paused" then
 		if event_status.catch_up and last_update_time then
 			M.process_catchup(event_id, event_status, last_update_time, current_time, event_queue)
 		end
@@ -572,8 +414,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 				if end_time then
 					local remaining = end_time - current_time
 					if remaining <= event_status.min_time then
-						event_status.status = "cancelled"
-						state.set_event_state(event_id, event_status)
+						M._cancel_event(event_id, event_status)
 						return false
 					end
 				end
@@ -582,23 +423,10 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 			local should_start = M.should_start_event(event_id, event_status, current_time)
 			if should_start then
 				local end_time = M.calculate_end_time(event_status, start_time)
-				event_status.status = "active"
-				event_status.start_time = start_time
-				event_status.end_time = end_time
-				event_status.last_update_time = current_time
-				state.set_event_state(event_id, event_status)
-
-				local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-				lifecycle.on_start(event_id, event_data)
-				lifecycle.on_enabled(event_id, event_data)
+				M._activate_event(event_id, event_status, start_time, end_time, current_time, event_queue)
 
 				if not end_time and not event_status.infinity and event_status.after and not event_status.start_at then
-					event_status.status = "completed"
-					event_status.last_update_time = current_time
-					state.set_event_state(event_id, event_status)
-
-					lifecycle.on_end(event_id, event_data)
-					lifecycle.on_disabled(event_id, event_data)
+					M._complete_event(event_id, event_status, start_time, end_time, current_time)
 
 					if event_status.cycle then
 						M.process_cycle(event_id, event_status, current_time, event_queue)
@@ -608,7 +436,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 				end
 
 				return true
-			elseif event_status.status == "cancelled" or event_status.status == "aborted" or event_status.status == "failed" then
+			elseif M._is_startable_status(event_status.status) and event_status.status ~= "pending" then
 				local all_conditions_passed, failed_condition = conditions.evaluate_conditions(event_status)
 				if all_conditions_passed then
 					event_status.status = "pending"
@@ -624,13 +452,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 		if not event_status.catch_up or not last_update_time then
 			local end_time = event_status.end_time
 			if end_time and current_time >= end_time then
-				event_status.status = "completed"
-				event_status.last_update_time = current_time
-				state.set_event_state(event_id, event_status)
-
-				local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
-				lifecycle.on_end(event_id, event_data)
-				lifecycle.on_disabled(event_id, event_data)
+				M._complete_event(event_id, event_status, nil, end_time, current_time)
 
 				if event_status.cycle then
 					M.process_cycle(event_id, event_status, current_time, event_queue)
@@ -693,7 +515,7 @@ function M.update_all(current_time, event_queue)
 				local after_status = state.get_event_state(after_event_id)
 				if after_status and after_status.status == "completed" and after_status.end_time then
 					local current_event_status = state.get_event_state(event_id)
-					if current_event_status and (current_event_status.status == "pending" or current_event_status.status == "cancelled" or current_event_status.status == "aborted" or current_event_status.status == "failed" or current_event_status.status == "paused") then
+					if current_event_status and (M._is_startable_status(current_event_status.status) or current_event_status.status == "paused") then
 						if not current_event_status.start_time or current_event_status.start_time < after_status.end_time then
 							current_event_status.start_time = after_status.end_time
 							state.set_event_state(event_id, current_event_status)
@@ -711,6 +533,221 @@ function M.update_all(current_time, event_queue)
 
 	state.set_last_update_time(current_time)
 	return any_updated
+end
+
+
+---Check if event status allows starting
+---@param status string
+---@return boolean
+function M._is_startable_status(status)
+	return status == "pending" or status == "cancelled" or status == "aborted" or status == "failed"
+end
+
+
+---Create event data table
+---@param event_id string
+---@param event_status schedule.event.state
+---@return table event_data
+function M._create_event_data(event_id, event_status)
+	return { id = event_id, category = event_status.category, payload = event_status.payload }
+end
+
+
+---Trigger event start lifecycle callbacks
+---@param event_id string
+---@param event_data table
+function M._trigger_event_start(event_id, event_data)
+	lifecycle.on_start(event_id, event_data)
+	lifecycle.on_enabled(event_id, event_data)
+end
+
+
+---Trigger event end lifecycle callbacks
+---@param event_id string
+---@param event_data table
+function M._trigger_event_end(event_id, event_data)
+	lifecycle.on_end(event_id, event_data)
+	lifecycle.on_disabled(event_id, event_data)
+end
+
+
+---Trigger full cycle lifecycle callbacks
+---@param event_id string
+---@param event_data table
+function M._trigger_event_cycle(event_id, event_data)
+	lifecycle.on_start(event_id, event_data)
+	lifecycle.on_enabled(event_id, event_data)
+	lifecycle.on_end(event_id, event_data)
+	lifecycle.on_disabled(event_id, event_data)
+end
+
+
+---Activate an event
+---@param event_id string
+---@param event_status schedule.event.state
+---@param start_time number
+---@param end_time number|nil
+---@param current_time number
+---@param event_queue table|nil
+function M._activate_event(event_id, event_status, start_time, end_time, current_time, event_queue)
+	event_status.status = "active"
+	event_status.start_time = start_time
+	event_status.end_time = end_time
+	event_status.last_update_time = current_time
+	state.set_event_state(event_id, event_status)
+
+	local event_data = M._create_event_data(event_id, event_status)
+	M._trigger_event_start(event_id, event_data)
+end
+
+
+---Complete an event
+---@param event_id string
+---@param event_status schedule.event.state
+---@param start_time number|nil
+---@param end_time number|nil
+---@param current_time number
+function M._complete_event(event_id, event_status, start_time, end_time, current_time)
+	event_status.status = "completed"
+	if start_time then
+		event_status.start_time = start_time
+	end
+	if end_time then
+		event_status.end_time = end_time
+	end
+	event_status.last_update_time = current_time
+	state.set_event_state(event_id, event_status)
+
+	local event_data = M._create_event_data(event_id, event_status)
+	M._trigger_event_end(event_id, event_data)
+end
+
+
+---Cancel an event
+---@param event_id string
+---@param event_status schedule.event.state
+function M._cancel_event(event_id, event_status)
+	event_status.status = "cancelled"
+	state.set_event_state(event_id, event_status)
+end
+
+
+---Update all events chained after this event
+---@param event_id string
+---@param all_events table|nil Optional cached events table
+function M._update_chained_events(event_id, all_events)
+	if not all_events then
+		all_events = state.get_all_events()
+	end
+	for chained_event_id, chained_event_status in pairs(all_events) do
+		if type(chained_event_status.after) == "string" and chained_event_status.after == event_id then
+			if chained_event_status.status == "pending" or chained_event_status.status == "completed" then
+				chained_event_status.start_time = nil
+				chained_event_status.status = "pending"
+				state.set_event_state(chained_event_id, chained_event_status)
+			end
+		end
+	end
+end
+
+
+---Collect missed cycles for catch-up
+---@param event_status schedule.event.state
+---@param start_time number
+---@param current_time number
+---@param skip_missed boolean
+---@return table cycles Array of {start, end_time} cycle data
+---@return number catch_count Number of cycles caught up
+function M._collect_missed_cycles(event_status, start_time, current_time, skip_missed)
+	local cycles_list = {}
+	local cycle_start = start_time
+	local max_catches = event_status.cycle.max_catches
+	local catch_count = 0
+
+	while cycle_start and cycle_start <= current_time do
+		if max_catches and catch_count >= max_catches then
+			break
+		end
+		local cycle_end = M.calculate_end_time(event_status, cycle_start)
+		if cycle_end and cycle_end <= current_time then
+			if not skip_missed then
+				table.insert(cycles_list, { start = cycle_start, end_time = cycle_end })
+			end
+			catch_count = catch_count + 1
+			local next_cycle = cycles.calculate_next_cycle(
+				event_status.cycle,
+				current_time,
+				cycle_end,
+				start_time
+			)
+			if next_cycle then
+				cycle_start = next_cycle
+			else
+				break
+			end
+		else
+			break
+		end
+	end
+
+	if skip_missed and catch_count > 0 then
+		local last_cycle_start = start_time
+		for i = 1, catch_count - 1 do
+			local cycle_end = M.calculate_end_time(event_status, last_cycle_start)
+			if cycle_end then
+				local next_cycle = cycles.calculate_next_cycle(
+					event_status.cycle,
+					current_time,
+					cycle_end,
+					start_time
+				)
+				if next_cycle then
+					last_cycle_start = next_cycle
+				else
+					break
+				end
+			else
+				break
+			end
+		end
+		local final_end = M.calculate_end_time(event_status, last_cycle_start)
+		if final_end then
+			table.insert(cycles_list, { start = last_cycle_start, end_time = final_end })
+		end
+	end
+
+	return cycles_list, catch_count
+end
+
+
+---Apply a single catch-up cycle
+---@param event_id string
+---@param event_status schedule.event.state
+---@param cycle_start number
+---@param cycle_end number
+---@param current_time number
+---@param event_queue table|nil
+function M._apply_catchup_cycle(event_id, event_status, cycle_start, cycle_end, current_time, event_queue)
+	event_status.status = "active"
+	event_status.start_time = cycle_start
+	event_status.end_time = cycle_end
+	event_status.cycle_count = (event_status.cycle_count or 0) + 1
+	event_status.last_update_time = current_time
+	state.set_event_state(event_id, event_status)
+
+	if event_queue then
+		event_queue:push({
+			id = event_id,
+			category = event_status.category,
+			payload = event_status.payload,
+			status = "active",
+			start_time = cycle_start,
+			end_time = cycle_end
+		})
+	end
+
+	local event_data = M._create_event_data(event_id, event_status)
+	M._trigger_event_cycle(event_id, event_data)
 end
 
 
