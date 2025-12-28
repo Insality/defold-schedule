@@ -24,20 +24,27 @@ return function()
 		end)
 
 		it("Should catch up missed events when catch_up is true", function()
+			local count = 0
+
 			local event_id = schedule.event()
 				:category("reward")
 				:after(60)
 				:duration(1)
+				:on_start(function()
+					count = count + 1
+				end)
 				:catch_up(true)
 				:save()
 
 			set_time(60)
 			schedule.update()
+			assert(count == 1, "on_start should be called")
 			local status = schedule.get_status(event_id)
 			assert(status.status == "active", "Event should be active")
 
 			set_time(1000)
 			schedule.update()
+			assert(count > 10, "on_start should be called multiple times")
 			status = schedule.get_status(event_id)
 			assert(status.status == "completed", "Event should be completed after catch up")
 		end)

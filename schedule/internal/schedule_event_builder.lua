@@ -1,11 +1,7 @@
----Event builder for fluent API
 local config = require("schedule.internal.schedule_config")
-local time_utils = require("schedule.internal.schedule_time")
 local logger = require("schedule.internal.schedule_logger")
 
-
 local event_id_counter = 0
-
 
 ---@class schedule.event_builder
 ---@field config schedule.event_config
@@ -225,7 +221,7 @@ function M:save()
 		end
 	else
 		event_id_counter = event_id_counter + 1
-		event_id = "event_" .. tostring(socket.gettime() * 1000000) .. "_" .. event_id_counter .. "_" .. math.random(1000000)
+		event_id = "schedule_" .. event_id_counter
 		config.set_event_config(event_id, self.config)
 	end
 
