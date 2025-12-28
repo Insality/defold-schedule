@@ -245,6 +245,16 @@ function M:pause()
 	state.set_event_state(event_id, event_status)
 	self.state = event_status
 
+	local event_data = {
+		id = event_id,
+		category = event_status.category,
+		payload = event_status.payload,
+		status = "paused",
+		start_time = event_status.start_time,
+		end_time = event_status.end_time
+	}
+	lifecycle.on_pause(event_id, event_data)
+
 	return true
 end
 
@@ -272,7 +282,15 @@ function M:resume()
 	state.set_event_state(event_id, event_status)
 	self.state = event_status
 
-	local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
+	local event_data = {
+		id = event_id,
+		category = event_status.category,
+		payload = event_status.payload,
+		status = "active",
+		start_time = event_status.start_time,
+		end_time = event_status.end_time
+	}
+	lifecycle.on_resume(event_id, event_data)
 	lifecycle.on_enabled(event_id, event_data)
 
 	return true

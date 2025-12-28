@@ -18,7 +18,7 @@ M.event_queue = queue.create()
 
 ---Register callback for event
 ---@param event_id string
----@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"
+---@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
 ---@param callback function|string|nil
 function M.register_callback(event_id, callback_type, callback)
 	if not callbacks[event_id] then
@@ -30,7 +30,7 @@ end
 
 ---Get callback for event
 ---@param event_id string
----@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"
+---@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
 ---@return function|string|nil
 function M.get_callback(event_id, callback_type)
 	if not callbacks[event_id] then
@@ -55,11 +55,11 @@ end
 
 
 ---Push event to queue
----@param callback_type string Lifecycle callback type ("active", "start", "end", "disabled")
+---@param event_type string Event type ("start", "end", "enabled", "disabled", "paused", "resume", "fail", "active")
 ---@param event_data table Event data to push
-function M.push_event(callback_type, event_data)
+function M.push_event(event_type, event_data)
 	M.event_queue:push({
-		callback_type = callback_type,
+		callback_type = event_type,
 		id = event_data.id,
 		category = event_data.category,
 		payload = event_data.payload,
@@ -67,6 +67,30 @@ function M.push_event(callback_type, event_data)
 		start_time = event_data.start_time,
 		end_time = event_data.end_time
 	})
+end
+
+
+---Call lifecycle callback safely and push event to queue
+---@param event_id string
+---@param callback_type string Callback type ("on_start", "on_enabled", etc.)
+---@param event_type string Event type to push ("start", "enabled", etc.)
+---@param event_data table Event data to pass
+function M.trigger_callback(event_id, callback_type, event_type, event_data)
+	logger:info("Lifecycle: " .. callback_type, { event_id = event_id, category = event_data.category })
+
+	local callback = M.get_callback(event_id, callback_type)
+	if callback and type(callback) == "function" then
+		local success, err = pcall(callback, event_data)
+		if not success then
+			logger:error("Lifecycle callback failed", {
+				callback = callback_type,
+				error = tostring(err),
+				event_id = event_data.id
+			})
+		end
+	end
+
+	M.push_event(event_type, event_data)
 end
 
 
@@ -94,11 +118,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_start(event_id, event_data)
-	logger:info("Lifecycle: on_start", { event_id = event_id, category = event_data.category })
-	local callback = M.get_callback(event_id, "on_start")
-	if callback and type(callback) == "function" then
-		M.call_callback(callback, event_data, "on_start")
-	end
+	M.trigger_callback(event_id, "on_start", "start", event_data)
 end
 
 
@@ -106,13 +126,9 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_enabled(event_id, event_data)
-	logger:info("Lifecycle: on_enabled", { event_id = event_id, category = event_data.category })
+	M.trigger_callback(event_id, "on_enabled", "enabled", event_data)
 	if event_data.status == "active" then
 		M.push_event("active", event_data)
-	end
-	local callback = M.get_callback(event_id, "on_enabled")
-	if callback and type(callback) == "function" then
-		M.call_callback(callback, event_data, "on_enabled")
 	end
 end
 
@@ -121,11 +137,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_disabled(event_id, event_data)
-	logger:info("Lifecycle: on_disabled", { event_id = event_id, category = event_data.category })
-	local callback = M.get_callback(event_id, "on_disabled")
-	if callback and type(callback) == "function" then
-		M.call_callback(callback, event_data, "on_disabled")
-	end
+	M.trigger_callback(event_id, "on_disabled", "disabled", event_data)
 end
 
 
@@ -133,11 +145,31 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_end(event_id, event_data)
-	logger:info("Lifecycle: on_end", { event_id = event_id, category = event_data.category })
-	local callback = M.get_callback(event_id, "on_end")
-	if callback and type(callback) == "function" then
-		M.call_callback(callback, event_data, "on_end")
-	end
+	M.trigger_callback(event_id, "on_end", "end", event_data)
+end
+
+
+---Trigger on_pause callback
+---@param event_id string
+---@param event_data table
+function M.on_pause(event_id, event_data)
+	M.trigger_callback(event_id, "on_pause", "paused", event_data)
+end
+
+
+---Trigger on_resume callback
+---@param event_id string
+---@param event_data table
+function M.on_resume(event_id, event_data)
+	M.trigger_callback(event_id, "on_resume", "resume", event_data)
+end
+
+
+---Trigger on_fail callback
+---@param event_id string
+---@param event_data table
+function M.on_fail(event_id, event_data)
+	M.trigger_callback(event_id, "on_fail", "fail", event_data)
 end
 
 

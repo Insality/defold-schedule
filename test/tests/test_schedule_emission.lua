@@ -15,7 +15,9 @@ return function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
-				emission_count = emission_count + 1
+				if event.callback_type == "active" then
+					emission_count = emission_count + 1
+				end
 				return true
 			end)
 
@@ -42,7 +44,9 @@ return function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
-				emission_count = emission_count + 1
+				if event.callback_type == "active" then
+					emission_count = emission_count + 1
+				end
 				return true
 			end)
 
@@ -71,7 +75,9 @@ return function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
-				emission_count = emission_count + 1
+				if event.callback_type == "active" then
+					emission_count = emission_count + 1
+				end
 				return true
 			end)
 
@@ -102,10 +108,12 @@ return function()
 			local emissions = {}
 
 			schedule.on_event:subscribe(function(event)
-				table.insert(emissions, {
-					id = event.id,
-					start_time = event.start_time
-				})
+				if event.callback_type == "active" then
+					table.insert(emissions, {
+						id = event.id,
+						start_time = event.start_time
+					})
+				end
 				return true
 			end)
 
@@ -133,7 +141,9 @@ return function()
 			local emission_order = {}
 
 			schedule.on_event:subscribe(function(event)
-				table.insert(emission_order, "emission")
+				if event.callback_type == "active" then
+					table.insert(emission_order, "emission")
+				end
 				return true
 			end)
 

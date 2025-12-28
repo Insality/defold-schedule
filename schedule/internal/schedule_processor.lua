@@ -102,6 +102,8 @@ function M.should_start_event(event_id, event_status, current_time, last_update_
 		if event_status.abort_on_fail then
 			event_status.status = "aborted"
 			state.set_event_state(event_id, event_status)
+			local event_data = M._create_event_data(event_id, event_status)
+			lifecycle.on_fail(event_id, event_data)
 		end
 		return false
 	end

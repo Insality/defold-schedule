@@ -40,7 +40,7 @@ return function()
 		it("Should skip missed events when catch_up is false", function()
 			local trigger_count = 0
 			schedule.on_event:subscribe(function(event)
-				if event.category == "reward" then
+				if event.category == "reward" and event.callback_type == "active" then
 					trigger_count = trigger_count + 1
 				end
 				return true
@@ -81,7 +81,7 @@ return function()
 		it("Should catch up with cycle events", function()
 			local trigger_count = 0
 			schedule.on_event:subscribe(function(event)
-				if event.category == "reward" then
+				if event.category == "reward" and event.callback_type == "active" then
 					trigger_count = trigger_count + 1
 				end
 				return true

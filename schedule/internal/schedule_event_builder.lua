@@ -202,6 +202,33 @@ function M:on_end(callback)
 end
 
 
+---Set callback called when the event is paused. Use for pausing timers, animations, or other active state.
+---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+---@return schedule.event_builder Self for method chaining
+function M:on_pause(callback)
+	self.config.on_pause = callback
+	return self
+end
+
+
+---Set callback called when the event is resumed from paused state. Use for resuming timers, animations, or other active state.
+---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+---@return schedule.event_builder Self for method chaining
+function M:on_resume(callback)
+	self.config.on_resume = callback
+	return self
+end
+
+
+---Set callback called when the event fails (aborted due to condition failure). Use for handling failure cases.
+---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+---@return schedule.event_builder Self for method chaining
+function M:on_fail(callback)
+	self.config.on_fail = callback
+	return self
+end
+
+
 ---Set flag to abort event when conditions fail. When conditions fail, event status will be set to "aborted" and will not retry.
 ---@return schedule.event_builder Self for method chaining
 function M:abort_on_fail()
@@ -358,6 +385,15 @@ function M:save()
 	end
 	if self.config.on_end then
 		lifecycle.register_callback(event_id, "on_end", self.config.on_end)
+	end
+	if self.config.on_pause then
+		lifecycle.register_callback(event_id, "on_pause", self.config.on_pause)
+	end
+	if self.config.on_resume then
+		lifecycle.register_callback(event_id, "on_resume", self.config.on_resume)
+	end
+	if self.config.on_fail then
+		lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
 	end
 
 	self.event_id = event_id

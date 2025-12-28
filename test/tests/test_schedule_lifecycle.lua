@@ -189,6 +189,291 @@ return function()
 			schedule.update()
 			assert(start_called, "on_start should be called for same persistent event")
 		end)
+
+
+		it("Should push events to queue for all callback types", function()
+			local events = {}
+			schedule.on_event:subscribe(function(event)
+				table.insert(events, event)
+			end)
+
+			local event = schedule.event()
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:on_start(function() end)
+				:on_enabled(function() end)
+				:on_end(function() end)
+				:on_disabled(function() end)
+				:save()
+
+			time = 60
+			schedule.update()
+
+			local event_types = {}
+			for _, e in ipairs(events) do
+				table.insert(event_types, e.callback_type)
+			end
+
+			assert(table.concat(event_types, ","):find("start"), "Should have start event")
+			assert(table.concat(event_types, ","):find("enabled"), "Should have enabled event")
+			assert(table.concat(event_types, ","):find("active"), "Should have active event")
+
+			time = 180
+			schedule.update()
+
+			event_types = {}
+			for _, e in ipairs(events) do
+				table.insert(event_types, e.callback_type)
+			end
+
+			assert(table.concat(event_types, ","):find("end"), "Should have end event")
+			assert(table.concat(event_types, ","):find("disabled"), "Should have disabled event")
+		end)
+
+
+		it("Should push paused event to queue", function()
+			local events = {}
+			schedule.on_event:subscribe(function(event)
+				table.insert(events, event)
+			end)
+
+			local pause_called = false
+			local event = schedule.event()
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:on_pause(function(event_data)
+					pause_called = true
+				end)
+				:save()
+
+			time = 60
+			schedule.update()
+			assert(event:get_status() == "active", "Event should be active")
+
+			event:pause()
+			assert(event:get_status() == "paused", "Event should be paused")
+			assert(pause_called, "on_pause callback should be called")
+
+			local has_paused_event = false
+			for _, e in ipairs(events) do
+				if e.callback_type == "paused" then
+					has_paused_event = true
+					assert(e.id == event:get_id(), "Paused event should have correct ID")
+					break
+				end
+			end
+			assert(has_paused_event, "Should have paused event in queue")
+		end)
+
+
+		it("Should push resume event to queue", function()
+			local events = {}
+			schedule.on_event:subscribe(function(event)
+				table.insert(events, event)
+			end)
+
+			local resume_called = false
+			local event = schedule.event()
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:on_resume(function(event_data)
+					resume_called = true
+				end)
+				:save()
+
+			time = 60
+			schedule.update()
+			event:pause()
+
+			event:resume()
+			assert(event:get_status() == "active", "Event should be active")
+			assert(resume_called, "on_resume callback should be called")
+
+			local has_resume_event = false
+			for _, e in ipairs(events) do
+				if e.callback_type == "resume" then
+					has_resume_event = true
+					assert(e.id == event:get_id(), "Resume event should have correct ID")
+					break
+				end
+			end
+			assert(has_resume_event, "Should have resume event in queue")
+		end)
+
+
+		it("Should push fail event to queue when abort_on_fail triggers", function()
+			schedule.register_condition("always_false", function(data)
+				return false
+			end)
+
+			local events = {}
+			schedule.on_event:subscribe(function(event)
+				table.insert(events, event)
+			end)
+
+			local fail_called = false
+			local event = schedule.event()
+				:category("offer")
+				:after(60)
+				:duration(120)
+				:condition("always_false", {})
+				:abort_on_fail()
+				:on_fail(function(event_data)
+					fail_called = true
+				end)
+				:save()
+
+			time = 60
+			schedule.update()
+			assert(event:get_status() == "aborted", "Event should be aborted")
+			assert(fail_called, "on_fail callback should be called")
+
+			local has_fail_event = false
+			for _, e in ipairs(events) do
+				if e.callback_type == "fail" then
+					has_fail_event = true
+					assert(e.id == event:get_id(), "Fail event should have correct ID")
+					break
+				end
+			end
+			assert(has_fail_event, "Should have fail event in queue")
+		end)
+
+
+		it("Should only emit active events on state restore, not start events", function()
+			local event1 = schedule.event("event1")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			local event2 = schedule.event("event2")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			time = 60
+			schedule.update()
+
+			assert(event1:get_status() == "active", "Event1 should be active")
+			assert(event2:get_status() == "active", "Event2 should be active")
+
+			local saved_state = schedule.get_state()
+			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
+
+			local events = {}
+			schedule.on_event:subscribe(function(event)
+				table.insert(events, event)
+			end)
+
+			schedule.set_state(saved_state)
+
+			schedule.event("event1")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			schedule.event("event2")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			schedule.update()
+
+			local event_types = {}
+			for _, e in ipairs(events) do
+				table.insert(event_types, e.callback_type)
+			end
+
+			local has_start = false
+			local has_active = false
+			for _, etype in ipairs(event_types) do
+				if etype == "start" then
+					has_start = true
+				end
+				if etype == "active" then
+					has_active = true
+				end
+			end
+
+			assert(not has_start, "Should not have start events on state restore")
+			assert(has_active, "Should have active events on state restore")
+		end)
+
+
+		it("Should emit active events for all active events on state restore", function()
+			local event1 = schedule.event("restore_event1")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			local event2 = schedule.event("restore_event2")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			local event3 = schedule.event("restore_event3")
+				:category("liveops")
+				:after(200)
+				:duration(120)
+				:save()
+
+			time = 60
+			schedule.update()
+
+			assert(event1:get_status() == "active", "Event1 should be active")
+			assert(event2:get_status() == "active", "Event2 should be active")
+			assert(event3:get_status() == "pending", "Event3 should be pending")
+
+			local saved_state = schedule.get_state()
+			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
+
+			local events = {}
+			schedule.on_event:subscribe(function(event)
+				table.insert(events, event)
+			end)
+
+			schedule.set_state(saved_state)
+
+			schedule.event("restore_event1")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			schedule.event("restore_event2")
+				:category("liveops")
+				:after(60)
+				:duration(120)
+				:save()
+
+			schedule.event("restore_event3")
+				:category("liveops")
+				:after(200)
+				:duration(120)
+				:save()
+
+			schedule.update()
+
+			local active_count = 0
+			for _, e in ipairs(events) do
+				if e.callback_type == "active" then
+					active_count = active_count + 1
+				end
+			end
+
+			assert(active_count == 2, "Should have 2 active events on restore")
+		end)
 	end)
 end
 

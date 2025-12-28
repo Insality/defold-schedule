@@ -40,11 +40,11 @@ return function()
 			local offer_count = 0
 
 			schedule.on_event:subscribe(function(event)
-				if event.category == "craft" then
+				if event.category == "craft" and event.callback_type == "active" then
 					craft_count = craft_count + 1
 					return true
 				end
-				if event.category == "offer" then
+				if event.category == "offer" and event.callback_type == "active" then
 					offer_count = offer_count + 1
 					return true
 				end
@@ -125,7 +125,9 @@ return function()
 			local call_count = 0
 			---@type any
 			local subscription = schedule.on_event:subscribe(function(event)
-				call_count = call_count + 1
+				if event.callback_type == "active" then
+					call_count = call_count + 1
+				end
 				return true
 			end)
 
