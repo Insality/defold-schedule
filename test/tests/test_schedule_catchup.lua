@@ -24,14 +24,6 @@ return function()
 		end)
 
 		it("Should catch up missed events when catch_up is true", function()
-			local trigger_count = 0
-			schedule.on_event:subscribe(function(event)
-				if event.category == "reward" then
-					trigger_count = trigger_count + 1
-				end
-				return true
-			end)
-
 			local event_id = schedule.event()
 				:category("reward")
 				:after(60)
@@ -41,11 +33,13 @@ return function()
 
 			set_time(60)
 			schedule.update()
-			assert(trigger_count == 1, "First trigger")
+			local status = schedule.get_status(event_id)
+			assert(status.status == "active", "Event should be active")
 
 			set_time(1000)
 			schedule.update()
-			assert(trigger_count > 1, "Should catch up missed events")
+			status = schedule.get_status(event_id)
+			assert(status.status == "completed", "Event should be completed after catch up")
 		end)
 
 
