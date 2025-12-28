@@ -141,7 +141,7 @@ return function()
 
 			schedule.on_event:unsubscribe(subscription)
 
-			local event_id2 = schedule.event()
+			schedule.event()
 				:category("craft")
 				:after(120)
 				:duration(120)

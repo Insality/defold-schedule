@@ -88,6 +88,7 @@ return function()
 			assert(fail_called, "on_fail callback should be called")
 
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "cancelled" or event_info:get_status() == "failed", "Event should be cancelled or failed")
 		end)
 
@@ -114,6 +115,7 @@ return function()
 			assert(fail_called, "on_fail callback should be called")
 
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "aborted" or event_info:get_status() == "failed", "Event should be aborted or failed")
 		end)
 
@@ -134,11 +136,13 @@ return function()
 			time = 60
 			schedule.update()
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			local initial_status = event_info:get_status()
 
 			condition_value = true
 			schedule.update()
 			event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() ~= initial_status or event_info:get_status() == "active", "Status should change when condition becomes true")
 		end)
 	end)

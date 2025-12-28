@@ -30,12 +30,14 @@ return function()
 			schedule.update()
 			assert(count == 1, "on_start should be called")
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "active", "Event should be active")
 
 			time = 1000
 			schedule.update()
 			assert(count > 5, "on_start should be called multiple times")
 			event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "completed", "Event should be completed after catch up")
 		end)
 
@@ -78,6 +80,7 @@ return function()
 			schedule.update()
 
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "completed", "Event should be completed after catch up")
 		end)
 
@@ -124,6 +127,7 @@ return function()
 			time = 10000
 			schedule.update()
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "completed", "Event should complete after offline period")
 		end)
 

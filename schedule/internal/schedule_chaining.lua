@@ -29,8 +29,8 @@ function M.can_start_chain(after_event_id, event_config, current_time)
 	end
 
 	local wait_online = event_config.after_options and event_config.after_options.wait_online
-	if wait_online then
-		if after_status.end_time and after_status.end_time > current_time then
+	if wait_online == false or wait_online == nil then
+		if after_status.end_time and current_time < after_status.end_time then
 			return false, nil
 		end
 		return true, after_status.end_time or current_time

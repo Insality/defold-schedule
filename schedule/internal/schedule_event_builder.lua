@@ -90,6 +90,7 @@ function M:cycle(cycle_type, options)
 		seconds = options.seconds,
 		anchor = options.anchor,
 		skip_missed = options.skip_missed,
+		max_catches = options.max_catches,
 		weekdays = options.weekdays,
 		time = options.time,
 		day = options.day,

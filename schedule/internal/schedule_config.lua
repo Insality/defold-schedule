@@ -3,6 +3,7 @@
 ---@field seconds number|nil For "every" type
 ---@field anchor "start"|"end"|nil For "every" type
 ---@field skip_missed boolean|nil
+---@field max_catches number|nil Maximum number of cycles to catch up
 ---@field weekdays string[]|nil For "weekly" type (e.g., {"sun", "mon"})
 ---@field time string|nil Time string (e.g., "14:00")
 ---@field day number|nil For "monthly" type

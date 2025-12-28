@@ -23,16 +23,19 @@ return function()
 			time = 60
 			schedule.update()
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "active", "Event should be active at first trigger")
 
 			time = 61
 			schedule.update()
 			event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "completed", "Event should complete after duration")
 
 			time = 180
 			schedule.update()
 			event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "active", "Event should cycle and be active again")
 		end)
 
@@ -96,6 +99,7 @@ return function()
 			time = 1000
 			schedule.update()
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "active" or event_info:get_status() == "completed", "Should skip to current cycle")
 		end)
 

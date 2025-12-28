@@ -12,7 +12,7 @@ return function()
 			time = 0
 		end)
 
-		it("Should chain event after another event", function()
+		it("Should chain event after another event with default wait_online", function()
 			local craft_1 = schedule.event()
 				:category("craft")
 				:after(60)
@@ -21,7 +21,7 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = true })
+				:after(craft_1)
 				:duration(120)
 				:save()
 
@@ -42,7 +42,7 @@ return function()
 		end)
 
 
-		it("Should chain event with wait_online false", function()
+		it("Should chain event with wait_online false (default)", function()
 			local craft_1 = schedule.event()
 				:category("craft")
 				:after(60)
@@ -66,6 +66,61 @@ return function()
 		end)
 
 
+		it("Should calculate time when chained event starts after offline period", function()
+			local craft_1 = schedule.event()
+				:category("craft")
+				:after(60)
+				:duration(120)
+				:save()
+
+			local craft_2 = schedule.event()
+				:category("craft")
+				:after(craft_1)
+				:duration(120)
+				:save()
+
+			time = 60
+			schedule.update()
+			assert(schedule.get(craft_1):get_status() == "active")
+			assert(schedule.get(craft_2):get_status() == "pending")
+
+			time = 500
+			schedule.update()
+			assert(schedule.get(craft_1):get_status() == "completed")
+			local craft_2_info = schedule.get(craft_2)
+			assert(craft_2_info ~= nil, "Event info should exist")
+			assert(craft_2_info:get_status() == "active", "Second event should start after first completes")
+			assert(craft_2_info:get_start_time() == 180, "Second event should start at first event end time")
+		end)
+
+
+		it("Should wait for update when wait_online is false and previous event completed offline", function()
+			local craft_1 = schedule.event()
+				:category("craft")
+				:after(60)
+				:duration(120)
+				:save()
+
+			local craft_2 = schedule.event()
+				:category("craft")
+				:after(craft_1, { wait_online = false })
+				:duration(120)
+				:save()
+
+			time = 60
+			schedule.update()
+			assert(schedule.get(craft_1):get_status() == "active")
+
+			time = 500
+			schedule.update()
+			assert(schedule.get(craft_1):get_status() == "completed")
+			local craft_2_info = schedule.get(craft_2)
+			assert(craft_2_info ~= nil, "Event info should exist")
+			assert(craft_2_info:get_status() == "active", "Second event should start after update")
+			assert(craft_2_info:get_start_time() == 180, "Second event should start at first event end time")
+		end)
+
+
 		it("Should handle chained events with different durations", function()
 			local craft_1 = schedule.event()
 				:category("craft")
@@ -85,12 +140,16 @@ return function()
 
 			time = 120
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			assert(schedule.get(craft_2):get_status() == "active")
+			local craft_1_info = schedule.get(craft_1)
+			local craft_2_info = schedule.get(craft_2)
+			assert(craft_1_info ~= nil, "Event info should exist")
+			assert(craft_2_info ~= nil, "Event info should exist")
+			assert(craft_1_info:get_status() == "completed")
+			assert(craft_2_info:get_status() == "active")
 
 			time = 240
 			schedule.update()
-			assert(schedule.get(craft_2):get_status() == "completed")
+			assert(craft_2_info:get_status() == "completed")
 		end)
 
 
@@ -178,9 +237,15 @@ return function()
 
 			time = 120
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			assert(schedule.get(craft_2):get_status() == "active")
-			assert(schedule.get(craft_3):get_status() == "pending")
+			local craft_1_info = schedule.get(craft_1)
+			local craft_2_info = schedule.get(craft_2)
+			local craft_3_info = schedule.get(craft_3)
+			assert(craft_1_info ~= nil, "Event info should exist")
+			assert(craft_2_info ~= nil, "Event info should exist")
+			assert(craft_3_info ~= nil, "Event info should exist")
+			assert(craft_1_info:get_status() == "completed")
+			assert(craft_2_info:get_status() == "active")
+			assert(craft_3_info:get_status() == "pending")
 
 			time = 180
 			schedule.update()
@@ -190,6 +255,31 @@ return function()
 			time = 240
 			schedule.update()
 			assert(schedule.get(craft_3):get_status() == "completed")
+		end)
+
+
+		it("Should handle chained events with wait_online true (immediate start)", function()
+			local craft_1 = schedule.event()
+				:category("craft")
+				:after(60)
+				:duration(120)
+				:save()
+
+			local craft_2 = schedule.event()
+				:category("craft")
+				:after(craft_1, { wait_online = true })
+				:duration(120)
+				:save()
+
+			time = 60
+			schedule.update()
+			assert(schedule.get(craft_1):get_status() == "active")
+			assert(schedule.get(craft_2):get_status() == "pending")
+
+			time = 180
+			schedule.update()
+			assert(schedule.get(craft_1):get_status() == "completed")
+			assert(schedule.get(craft_2):get_status() == "active", "Second event should start immediately when wait_online is true")
 		end)
 	end)
 end

@@ -23,11 +23,13 @@ return function()
 			time = 50
 			schedule.update()
 			local event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "pending", "Event should be pending before start_at")
 
 			time = 100
 			schedule.update()
 			event_info = schedule.get(event_id)
+			assert(event_info ~= nil, "Event info should exist")
 			assert(event_info:get_status() == "pending" or event_info:get_status() == "cancelled", "Event should not start if not enough time left")
 		end)
 

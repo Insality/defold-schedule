@@ -186,10 +186,16 @@ function M.process_catchup(event_id, event_config, last_update_time, current_tim
 				if not event_config.cycle.skip_missed then
 					local processed_cycles = {}
 					local cycle_start = start_time
+					local max_catches = event_config.cycle.max_catches
+					local catch_count = 0
 					while cycle_start and cycle_start <= current_time do
+						if max_catches and catch_count >= max_catches then
+							break
+						end
 						local cycle_end = M.calculate_end_time(event_config, cycle_start)
 						if cycle_end and cycle_end <= current_time then
 							table.insert(processed_cycles, { start = cycle_start, end_time = cycle_end })
+							catch_count = catch_count + 1
 							cycle_start = cycles.calculate_next_cycle(
 								event_config.cycle,
 								current_time,
@@ -248,7 +254,11 @@ function M.process_catchup(event_id, event_config, last_update_time, current_tim
 				else
 					local processed_count = 0
 					local cycle_start = start_time
+					local max_catches = event_config.cycle.max_catches
 					while cycle_start and cycle_start <= current_time do
+						if max_catches and processed_count >= max_catches then
+							break
+						end
 						local cycle_end = M.calculate_end_time(event_config, cycle_start)
 						if cycle_end and cycle_end <= current_time then
 							processed_count = processed_count + 1
@@ -334,6 +344,8 @@ function M.process_cycle(event_id, event_config, current_time, event_queue)
 			local anchor = event_config.cycle.anchor or "start"
 			local cycle_interval = event_config.cycle.seconds
 			local next_cycle_time = nil
+			local max_catches = event_config.cycle.max_catches
+			local catch_count = 0
 			
 			if cycle_interval and event_status.start_time then
 				local base_time
@@ -345,9 +357,13 @@ function M.process_cycle(event_id, event_config, current_time, event_queue)
 				
 				local cycle_start = base_time + cycle_interval
 				while cycle_start and cycle_start <= current_time do
+					if max_catches and catch_count >= max_catches then
+						break
+					end
 					local cycle_end = M.calculate_end_time(event_config, cycle_start)
 					if cycle_end and cycle_end <= current_time then
 						table.insert(processed_cycles, cycle_start)
+						catch_count = catch_count + 1
 						cycle_start = cycle_start + cycle_interval
 					else
 						break
@@ -445,6 +461,23 @@ function M.process_cycle(event_id, event_config, current_time, event_queue)
 			if next_cycle_time and next_cycle_time <= current_time then
 				local new_start_time = next_cycle_time
 				local new_end_time = M.calculate_end_time(event_config, new_start_time)
+
+				if event_config.min_time and new_end_time then
+					local remaining = new_end_time - current_time
+					if remaining < event_config.min_time then
+						local skipped_cycle_time = cycles.calculate_next_cycle(
+							event_config.cycle,
+							current_time,
+							new_end_time,
+							event_status.start_time
+						)
+						if skipped_cycle_time then
+							event_status.next_cycle_time = skipped_cycle_time
+							state.set_event_status(event_id, event_status)
+						end
+						return false
+					end
+				end
 
 				event_status.status = "active"
 				event_status.start_time = new_start_time

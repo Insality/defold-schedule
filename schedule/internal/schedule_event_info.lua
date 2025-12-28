@@ -10,6 +10,7 @@ local time_utils = require("schedule.internal.schedule_time")
 ---@field get_time_to_start fun(self: schedule.event_info): number
 ---@field get_payload fun(self: schedule.event_info): any
 ---@field get_category fun(self: schedule.event_info): string|nil
+---@field get_start_time fun(self: schedule.event_info): number|nil
 
 local M = {}
 
@@ -136,6 +137,17 @@ function M:get_category()
 		return nil
 	end
 	return event_config.category
+end
+
+
+---Get event start time
+---@return number|nil
+function M:get_start_time()
+	local event_status = self:_get_status()
+	if not event_status then
+		return nil
+	end
+	return event_status.start_time
 end
 
 
