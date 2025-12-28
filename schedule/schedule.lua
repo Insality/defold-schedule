@@ -72,7 +72,7 @@ end
 
 ---Get the complete schedule state for serialization. Call when saving your game to persist events.
 ---Critical for offline progression. Save to your save file system and restore with `set_state()` on load.
----@return schedule.state Complete state object suitable for serialization
+---@return schedule.state state Complete state object suitable for serialization
 function M.get_state()
 	return state.get_state()
 end
@@ -89,7 +89,7 @@ end
 ---Create a new event builder for scheduling timed events. Returns a builder with fluent API.
 ---Chain methods like `:category()`, `:after()`, `:duration()`, then call `:save()` to finalize.
 ---Nothing happens until `:save()` is called.
----@return schedule.event_builder Builder instance for configuring and saving the event
+---@return schedule.event_builder builder Builder instance for configuring and saving the event
 function M.event()
 	return event_builder.create()
 end
@@ -98,7 +98,7 @@ end
 ---Get an event object by ID. Returns a rich event object with methods like `get_time_left()`, `get_status()`, `get_payload()`.
 ---Use this for convenience methods and type-safe access. Use `get_status()` for raw state table access.
 ---@param event_id string The event ID returned from `event():save()` or set via `event():id()`
----@return schedule.event|nil Event object with query methods, or nil if event doesn't exist
+---@return schedule.event|nil event Event object with query methods, or nil if event doesn't exist
 function M.get(event_id)
 	local event_status = state.get_event_state(event_id)
 	if not event_status then
@@ -111,7 +111,7 @@ end
 ---Get the raw event state table by ID. Use for direct state access or legacy compatibility.
 ---Prefer `get()` for new code unless you specifically need raw state access.
 ---@param event_id string The event ID to query
----@return schedule.event.state|nil Raw event state table, or nil if event doesn't exist
+---@return schedule.event.state|nil status Raw event state table, or nil if event doesn't exist
 function M.get_status(event_id)
 	return state.get_event_state(event_id)
 end
@@ -163,7 +163,7 @@ end
 ---Iterates all events, so consider caching results for large event counts.
 ---@param category string|nil Category to filter by (e.g., "craft", "offer"), nil for any category
 ---@param status string|nil Status to filter by ("pending", "active", "completed", etc.), nil for any status
----@return table<string, schedule.event> Table mapping event_id -> event object
+---@return table<string, schedule.event> events Table mapping event_id -> event object
 function M.filter(category, status)
 	local result = {}
 	local all_events = state.get_all_events()

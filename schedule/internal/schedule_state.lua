@@ -16,7 +16,7 @@
 ---@class schedule.event.state
 ---@field event_id string|nil Event ID (key in state table)
 ---@field id string|nil Persistent event ID
----@field status "pending"|"active"|"completed"|"cancelled"|"aborted"|"failed"
+---@field status "pending"|"active"|"completed"|"cancelled"|"aborted"|"failed"|"paused"
 ---@field start_time number|nil
 ---@field end_time number|nil
 ---@field last_update_time number|nil
@@ -60,7 +60,7 @@ end
 
 
 ---Get the entire state (for serialization)
----@return schedule.state
+---@return schedule.state state Complete state object for serialization
 function M.get_state()
 	return state
 end
@@ -78,7 +78,7 @@ end
 
 ---Get event state
 ---@param event_id string
----@return schedule.event.state|nil
+---@return schedule.event.state|nil status Event state table or nil if event doesn't exist
 function M.get_event_state(event_id)
 	return state.events[event_id]
 end
@@ -94,14 +94,14 @@ end
 
 
 ---Get all events
----@return table<string, schedule.event.state>
+---@return table<string, schedule.event.state> events Table mapping event_id -> event state
 function M.get_all_events()
 	return state.events
 end
 
 
 ---Get last update time
----@return number|nil
+---@return number|nil last_update_time Last update time in seconds, or nil if never updated
 function M.get_last_update_time()
 	return state.last_update_time
 end

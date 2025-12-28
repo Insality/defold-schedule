@@ -14,7 +14,7 @@ local M = {}
 ---Calculate event start time
 ---@param event_status schedule.event.state
 ---@param current_time number
----@return number|nil start_time
+---@return number|nil start_time Calculated start time in seconds, or nil if cannot be calculated
 function M.calculate_start_time(event_status, current_time)
 	if event_status.start_at then
 		local start_at = event_status.start_at
@@ -44,7 +44,7 @@ end
 ---Calculate event end time
 ---@param event_status schedule.event.state
 ---@param start_time number
----@return number|nil end_time
+---@return number|nil end_time Calculated end time in seconds, or nil for infinity events
 function M.calculate_end_time(event_status, start_time)
 	if event_status.infinity then
 		return nil
@@ -70,7 +70,7 @@ end
 ---@param event_id string
 ---@param event_status schedule.event.state
 ---@param current_time number
----@return boolean should_start
+---@return boolean should_start True if event should start, false otherwise
 function M.should_start_event(event_id, event_status, current_time)
 	if event_status.status ~= "pending" and event_status.status ~= "cancelled" and event_status.status ~= "aborted" and event_status.status ~= "failed" then
 		return false
@@ -136,7 +136,7 @@ end
 ---@param last_update_time number|nil
 ---@param current_time number
 ---@param event_queue table|nil Event queue for emitting events
----@return boolean was_caught_up
+---@return boolean was_caught_up True if catch-up was processed, false otherwise
 function M.process_catchup(event_id, event_status, last_update_time, current_time, event_queue)
 	if not event_status.catch_up or not last_update_time then
 		return false
@@ -337,7 +337,7 @@ end
 ---@param event_status schedule.event.state
 ---@param current_time number
 ---@param event_queue table|nil Event queue for emitting events
----@return boolean cycle_processed
+---@return boolean cycle_processed True if cycle was processed, false otherwise
 function M.process_cycle(event_id, event_status, current_time, event_queue)
 	if not event_status.cycle then
 		return false
@@ -527,7 +527,7 @@ end
 ---@param current_time number
 ---@param last_update_time number|nil
 ---@param event_queue table|nil Event queue for emitting events
----@return boolean event_updated
+---@return boolean event_updated True if event was updated, false otherwise
 function M.update_event(event_id, current_time, last_update_time, event_queue)
 	local event_status = state.get_event_state(event_id)
 
@@ -535,7 +535,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 		return false
 	end
 
-	if event_status.status == "pending" or event_status.status == "cancelled" or event_status.status == "aborted" or event_status.status == "failed" then
+	if event_status.status == "pending" or event_status.status == "cancelled" or event_status.status == "aborted" or event_status.status == "failed" or event_status.status == "paused" then
 		if event_status.catch_up and last_update_time then
 			M.process_catchup(event_id, event_status, last_update_time, current_time, event_queue)
 		end
@@ -563,6 +563,10 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 		end
 
 		if start_time and current_time >= start_time then
+			if event_status.status == "cancelled" then
+				return false
+			end
+
 			if event_status.min_time then
 				local end_time = M.calculate_end_time(event_status, start_time)
 				if end_time then
@@ -647,6 +651,10 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 		end
 	end
 
+	if event_status.status == "paused" then
+		return false
+	end
+
 	if event_status.status == "completed" and event_status.cycle then
 		local cycle_processed = M.process_cycle(event_id, event_status, current_time, event_queue)
 		if cycle_processed then
@@ -685,7 +693,7 @@ function M.update_all(current_time, event_queue)
 				local after_status = state.get_event_state(after_event_id)
 				if after_status and after_status.status == "completed" and after_status.end_time then
 					local current_event_status = state.get_event_state(event_id)
-					if current_event_status and (current_event_status.status == "pending" or current_event_status.status == "cancelled" or current_event_status.status == "aborted" or current_event_status.status == "failed") then
+					if current_event_status and (current_event_status.status == "pending" or current_event_status.status == "cancelled" or current_event_status.status == "aborted" or current_event_status.status == "failed" or current_event_status.status == "paused") then
 						if not current_event_status.start_time or current_event_status.start_time < after_status.end_time then
 							current_event_status.start_time = after_status.end_time
 							state.set_event_state(event_id, current_event_status)
