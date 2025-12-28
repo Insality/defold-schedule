@@ -14,3 +14,4 @@ deployer_version_settings.ini
 bob*.jar
 dist
 manifest*.der
+doc.json
