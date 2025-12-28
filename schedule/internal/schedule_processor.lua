@@ -139,16 +139,10 @@ function M.process_catchup(event_id, event_status, last_update_time, current_tim
 			if not event_status.cycle then
 				local end_time = M.calculate_end_time(event_status, start_time)
 				if end_time and current_time >= end_time then
-					if event_queue then
-						event_queue:push({
-							id = event_id,
-							category = event_status.category,
-							payload = event_status.payload,
-							status = "active",
-							start_time = start_time,
-							end_time = end_time
-						})
-					end
+					event_status.status = "active"
+					event_status.start_time = start_time
+					event_status.end_time = end_time
+					state.set_event_state(event_id, event_status)
 					local event_data = M._create_event_data(event_id, event_status)
 					M._trigger_event_cycle(event_id, event_data)
 					event_status.status = "completed"
@@ -259,17 +253,6 @@ function M.process_cycle(event_id, event_status, current_time, event_queue)
 							event_status.cycle_count = (event_status.cycle_count or 0) + 1
 							state.set_event_state(event_id, event_status)
 
-							if event_queue then
-								event_queue:push({
-									id = event_id,
-									category = event_status.category,
-									payload = event_status.payload,
-									status = "active",
-									start_time = new_start_time,
-									end_time = new_end_time
-								})
-							end
-
 							M._update_chained_events(event_id)
 
 							local event_data = M._create_event_data(event_id, event_status)
@@ -338,17 +321,6 @@ function M.process_cycle(event_id, event_status, current_time, event_queue)
 				event_status.cycle_count = (event_status.cycle_count or 0) + 1
 				event_status.next_cycle_time = nil
 				state.set_event_state(event_id, event_status)
-
-				if event_queue then
-					event_queue:push({
-						id = event_id,
-						category = event_status.category,
-						payload = event_status.payload,
-						status = "active",
-						start_time = new_start_time,
-						end_time = new_end_time
-					})
-				end
 
 				M._update_chained_events(event_id)
 
@@ -551,7 +523,14 @@ end
 ---@param event_status schedule.event.state
 ---@return table event_data
 function M._create_event_data(event_id, event_status)
-	return { id = event_id, category = event_status.category, payload = event_status.payload }
+	return {
+		id = event_id,
+		category = event_status.category,
+		payload = event_status.payload,
+		status = event_status.status,
+		start_time = event_status.start_time,
+		end_time = event_status.end_time
+	}
 end
 
 
@@ -597,17 +576,6 @@ function M._activate_event(event_id, event_status, start_time, end_time, current
 	event_status.end_time = end_time
 	event_status.last_update_time = current_time
 	state.set_event_state(event_id, event_status)
-
-	if event_queue then
-		event_queue:push({
-			id = event_id,
-			category = event_status.category,
-			payload = event_status.payload,
-			status = "active",
-			start_time = start_time,
-			end_time = end_time
-		})
-	end
 
 	local event_data = M._create_event_data(event_id, event_status)
 	M._trigger_event_start(event_id, event_data)
@@ -747,17 +715,6 @@ function M._apply_catchup_cycle(event_id, event_status, cycle_start, cycle_end, 
 	event_status.cycle_count = (event_status.cycle_count or 0) + 1
 	event_status.last_update_time = current_time
 	state.set_event_state(event_id, event_status)
-
-	if event_queue then
-		event_queue:push({
-			id = event_id,
-			category = event_status.category,
-			payload = event_status.payload,
-			status = "active",
-			start_time = cycle_start,
-			end_time = cycle_end
-		})
-	end
 
 	local event_data = M._create_event_data(event_id, event_status)
 	M._trigger_event_cycle(event_id, event_data)

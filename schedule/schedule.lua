@@ -21,7 +21,6 @@
 ---end)
 ---```
 
-local queue = require("event.queue")
 local event_builder = require("schedule.internal.schedule_event_builder")
 local state = require("schedule.internal.schedule_state")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
@@ -48,11 +47,12 @@ M.WEEK = 604800
 ---Late subscribers receive queued events, ideal for UI that needs to catch up. Use for cross-cutting
 ---concerns (logging, analytics); use lifecycle callbacks for event-specific logic.
 ---Callback: `fun(event: table): boolean|nil` (return `true` to mark as handled)
+---Event table contains: `callback_type`, `id`, `category`, `payload`, `status`, `start_time`, `end_time`
 ---@class schedule.queue.on_event: queue
 ---@field push fun(_, event: table)
 ---@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): any
 ---@field unsubscribe fun(_, subscription: any)
-M.on_event = queue.create()
+M.on_event = lifecycle.event_queue
 
 
 ---Reset all schedule state. Clears all events, callbacks, conditions, subscriptions, and resets time tracking.
@@ -146,14 +146,6 @@ function M.update()
 					end_time = event_status.end_time
 				}
 				lifecycle.on_enabled(event_id, event_data)
-				M.on_event:push({
-					id = event_id,
-					category = event_status.category,
-					payload = event_status.payload,
-					status = "active",
-					start_time = event_status.start_time,
-					end_time = event_status.end_time
-				})
 			end
 		end
 	end

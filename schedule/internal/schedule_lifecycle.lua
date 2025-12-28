@@ -1,6 +1,7 @@
 ---Lifecycle callback management
 ---Callbacks cannot be serialized, so they are stored in memory only
 local logger = require("schedule.internal.schedule_logger")
+local queue = require("event.queue")
 
 
 local M = {}
@@ -9,6 +10,10 @@ local M = {}
 ---Internal callback storage
 ---@type table<string, table<string, function|string>>
 local callbacks = {}
+
+
+---Event queue for emitting events
+M.event_queue = queue.create()
 
 
 ---Register callback for event
@@ -42,9 +47,26 @@ function M.clear_callbacks(event_id)
 end
 
 
----Reset all callbacks
+---Reset all callbacks and clear event queue
 function M.reset_callbacks()
 	callbacks = {}
+	M.event_queue:clear()
+end
+
+
+---Push event to queue
+---@param callback_type string Lifecycle callback type ("active", "start", "end", "disabled")
+---@param event_data table Event data to push
+function M.push_event(callback_type, event_data)
+	M.event_queue:push({
+		callback_type = callback_type,
+		id = event_data.id,
+		category = event_data.category,
+		payload = event_data.payload,
+		status = event_data.status,
+		start_time = event_data.start_time,
+		end_time = event_data.end_time
+	})
 end
 
 
@@ -85,6 +107,9 @@ end
 ---@param event_data table
 function M.on_enabled(event_id, event_data)
 	logger:info("Lifecycle: on_enabled", { event_id = event_id, category = event_data.category })
+	if event_data.status == "active" then
+		M.push_event("active", event_data)
+	end
 	local callback = M.get_callback(event_id, "on_enabled")
 	if callback and type(callback) == "function" then
 		M.call_callback(callback, event_data, "on_enabled")
@@ -116,7 +141,4 @@ function M.on_end(event_id, event_data)
 end
 
 
-
-
 return M
-
