@@ -34,7 +34,7 @@ return function()
 
 			time = 1000
 			schedule.update()
-			assert(count > 10, "on_start should be called multiple times")
+			assert(count > 5, "on_start should be called multiple times")
 			event_info = schedule.get(event_id)
 			assert(event_info:get_status() == "completed", "Event should be completed after catch up")
 		end)

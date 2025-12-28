@@ -555,7 +555,7 @@ function M.update_event(event_id, event_config, current_time, last_update_time, 
 				lifecycle.on_start(event_config, { id = event_id, category = event_config.category, payload = event_config.payload })
 				lifecycle.on_enabled(event_config, { id = event_id, category = event_config.category, payload = event_config.payload })
 
-				if not end_time and not event_config.infinity then
+				if not end_time and not event_config.infinity and event_config.after and not event_config.start_at then
 					event_status.status = "completed"
 					event_status.last_update_time = current_time
 					state.set_event_status(event_id, event_status)
@@ -603,7 +603,10 @@ function M.update_event(event_id, event_config, current_time, last_update_time, 
 		else
 			if M.process_catchup(event_id, event_config, last_update_time, current_time, event_queue) then
 				if event_config.cycle then
-					M.process_cycle(event_id, event_config, current_time, event_queue)
+					local cycle_processed = M.process_cycle(event_id, event_config, current_time, event_queue)
+					if cycle_processed then
+						return true
+					end
 				end
 				return true
 			end
