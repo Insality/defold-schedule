@@ -230,6 +230,41 @@ function M:save()
 	end
 
 	assert(event_id ~= nil, "Event ID must be generated")
+
+	local state = require("schedule.internal.schedule_state")
+	local time_utils = require("schedule.internal.schedule_time")
+
+	local existing_status = state.get_event_status(event_id)
+	if not existing_status then
+		local current_time = time_utils.get_time()
+		local calculated_start_time = nil
+
+		if self.config.start_at then
+			local start_at = self.config.start_at
+			if type(start_at) == "string" then
+				calculated_start_time = time_utils.parse_iso_date(start_at)
+			elseif type(start_at) == "number" then
+				calculated_start_time = start_at
+			end
+		elseif self.config.after then
+			local after = self.config.after
+			if type(after) == "number" then
+				calculated_start_time = current_time + after
+			end
+		else
+			calculated_start_time = current_time
+		end
+
+		state.set_event_status(event_id, {
+			status = "pending",
+			start_time = calculated_start_time,
+			end_time = nil,
+			last_update_time = nil,
+			cycle_count = 0,
+			next_cycle_time = nil
+		})
+	end
+
 	logger:debug("Event saved", { event_id = event_id, category = self.config.category })
 	return event_id
 end

@@ -31,7 +31,7 @@ function M.evaluate_conditions(event_config)
 	for _, condition_data in ipairs(event_config.conditions) do
 		local evaluator = conditions[condition_data.name]
 		if not evaluator then
-			logger:warn("Condition not found", { name = condition_data.name })
+			logger:error("Condition not found", { name = condition_data.name })
 			return false, condition_data.name
 		end
 

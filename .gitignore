@@ -9,3 +9,8 @@ Thumbs.db
 .project
 .cproject
 builtins
+deployer_version_settings.ini
+
+bob*.jar
+dist
+manifest*.der

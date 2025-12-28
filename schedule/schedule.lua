@@ -18,7 +18,7 @@
 ---end)
 ---```
 
-local event_system = require("schedule.internal.schedule_event_system")
+local queue = require("event.queue")
 local event_builder = require("schedule.internal.schedule_event_builder")
 local config = require("schedule.internal.schedule_config")
 local state = require("schedule.internal.schedule_state")
@@ -40,17 +40,23 @@ M.DAY = 86400
 M.WEEK = 604800
 
 
----Global event subscription
----@class schedule.event.on_event: event
----@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): number
----@field unsubscribe fun(_, subscription_id: number)
----@field trigger fun(_, event: table)
-M.on_event = event_system.create()
+---Global event subscription queue
+---Events are pushed to this queue when they become active
+---Subscribers can subscribe later and will receive all queued events
+---Callback is fun(event: table): boolean|nil (return true to mark event as handled)
+---@class schedule.queue.on_event: queue
+---@field push fun(_, event: table)
+---@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): boolean
+M.on_event = queue.create()
 
 
 ---Timer handle for update loop
 ---@type any
 M.timer_id = nil
+
+
+---Track which events have already emitted
+local emitted_events = {}
 
 
 ---Initialize schedule system
@@ -84,6 +90,22 @@ function M.reset_state()
 end
 
 
+---Initialize event status when event is created
+local function initialize_event_status(event_id)
+	local event_status = state.get_event_status(event_id)
+	if not event_status then
+		state.set_event_status(event_id, {
+			status = "pending",
+			start_time = nil,
+			end_time = nil,
+			last_update_time = nil,
+			cycle_count = 0,
+			next_cycle_time = nil
+		})
+	end
+end
+
+
 ---Get state for serialization
 ---@return schedule.state
 function M.get_state()
@@ -109,7 +131,23 @@ end
 ---@param event_id string
 ---@return schedule.event_status|nil
 function M.get_status(event_id)
-	return state.get_event_status(event_id)
+	local event_status = state.get_event_status(event_id)
+	if not event_status then
+		return nil
+	end
+
+	local event_config = config.get_event_config(event_id)
+	if event_config then
+		local combined_status = {}
+		for k, v in pairs(event_status) do
+			combined_status[k] = v
+		end
+		combined_status.category = event_config.category
+		combined_status.payload = event_config.payload
+		return combined_status
+	end
+
+	return event_status
 end
 
 
@@ -119,10 +157,6 @@ end
 function M.register_condition(name, evaluator)
 	conditions.register_condition(name, evaluator)
 end
-
-
----Track which events have already emitted
-local emitted_events = {}
 
 
 ---Update schedule system
@@ -135,10 +169,10 @@ function M.update()
 	for event_id, event_config in pairs(all_events) do
 		local event_status = state.get_event_status(event_id)
 		if event_status and event_status.status == "active" then
-			local emit_key = event_id .. "_" .. (event_status.start_time or 0)
+			local emit_key = event_id .. "_" .. (event_status.start_time or 0) .. "_" .. (event_status.cycle_count or 0)
 			if not emitted_events[emit_key] and event_status.start_time and current_time >= event_status.start_time then
 				emitted_events[emit_key] = true
-				M.on_event:trigger({
+				M.on_event:push({
 					id = event_id,
 					category = event_config.category,
 					payload = event_config.payload,
@@ -148,7 +182,7 @@ function M.update()
 				})
 			end
 		elseif event_status and event_status.status ~= "active" then
-			local emit_key = event_id .. "_" .. (event_status.start_time or 0)
+			local emit_key = event_id .. "_" .. (event_status.start_time or 0) .. "_" .. (event_status.cycle_count or 0)
 			emitted_events[emit_key] = nil
 		end
 	end
