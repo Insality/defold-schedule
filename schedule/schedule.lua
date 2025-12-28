@@ -121,8 +121,9 @@ end
 
 
 ---Create new event builder
+---@param id string|nil Persistent event ID
 ---@return schedule.event_builder
-function M.event()
+function M.event(id)
 	return event_builder.create()
 end
 
