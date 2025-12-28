@@ -7,33 +7,34 @@ local event_id_counter = 0
 
 ---@class schedule.event_builder : schedule.event
 ---@field config table
----@field event_id string|nil
 local M = {}
 
 
----Create new event builder
----@return schedule.event_builder
+---Create a new event builder instance (internal - use schedule.event() instead).
+---@return schedule.event_builder New builder instance
 function M.create()
 	local self = setmetatable({}, { __index = M })
 	self.config = {}
-	self.event_id = nil
 	return self
 end
 
 
----Set event category
----@param category string
----@return schedule.event_builder
+---Set the event category for grouping and filtering. Enables filtering with `schedule.filter()`.
+---Use consistent lowercase names (e.g., "craft", "offer", "liveops", "cooldown").
+---@param category string Category name
+---@return schedule.event_builder Self for method chaining
 function M:category(category)
 	self.config.category = category
 	return self
 end
 
 
----Set event to start after N seconds or after another event
----@param after number|string Event ID or seconds
----@param options table|nil Options for chaining (wait_online, etc.)
----@return schedule.event_builder
+---Set event to start after a relative delay or after another event completes (event chaining).
+---Use for relative timing or sequential events. Use `start_at()` for absolute calendar-based timing.
+---Set `wait_online = true` in options to wait for player to be online before starting chained events.
+---@param after number|string Seconds to wait (number) or event ID to chain after (string)
+---@param options table|nil Options table with `wait_online` (boolean) for chaining behavior
+---@return schedule.event_builder Self for method chaining
 function M:after(after, options)
 	if type(after) == "string" then
 		self.config.after = after
@@ -46,45 +47,52 @@ function M:after(after, options)
 end
 
 
----Set event to start at specific time
----@param start_at number|string Timestamp or ISO date string
----@return schedule.event_builder
+---Set event to start at an absolute time (calendar-based scheduling). Use for LiveOps events or scheduled promotions.
+---ISO date strings (e.g., "2026-01-01T00:00:00") are more readable; use timestamps for programmatic calculation.
+---@param start_at number|string Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
+---@return schedule.event_builder Self for method chaining
 function M:start_at(start_at)
 	self.config.start_at = start_at
 	return self
 end
 
 
----Set event to end at specific time
----@param end_at number|string Timestamp or ISO date string
----@return schedule.event_builder
+---Set event to end at an absolute time (calendar-based end date). Use for fixed-date events like LiveOps.
+---Use `duration()` for relative durations calculated from start time.
+---@param end_at number|string Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
+---@return schedule.event_builder Self for method chaining
 function M:end_at(end_at)
 	self.config.end_at = end_at
 	return self
 end
 
 
----Set event duration
----@param duration number Duration in seconds
----@return schedule.event_builder
+---Set the event duration. Use for crafting timers, cooldowns, temporary buffs, or any relative-duration event.
+---End time is calculated as start_time + duration. For recurring events, each cycle uses the same duration.
+---@param duration number Duration in seconds (use `schedule.HOUR`, `schedule.DAY`, etc. for clarity)
+---@return schedule.event_builder Self for method chaining
 function M:duration(duration)
 	self.config.duration = duration
 	return self
 end
 
 
----Set event to never end
----@return schedule.event_builder
+---Set event to never end automatically (runs until manually cancelled). Use for permanent buffs,
+---continuous effects, or events that end based on game state rather than time.
+---@return schedule.event_builder Self for method chaining
 function M:infinity()
 	self.config.infinity = true
 	return self
 end
 
 
----Set event cycle
----@param cycle_type "every"|"weekly"|"monthly"|"yearly"
----@param options table Cycle options
----@return schedule.event_builder
+---Set the event to repeat on a cycle. Types: `"every"` (interval-based), `"weekly"` (calendar-based),
+---`"monthly"`, `"yearly"`. Set `skip_missed = true` for LiveOps (skip missed cycles), `false` for
+---daily rewards (catch-up). `anchor = "start"` (default) or `"end"` (gaps between cycles).
+---`max_catches` limits catch-up cycles during offline time.
+---@param cycle_type "every"|"weekly"|"monthly"|"yearly" Type of cycle repetition
+---@param options table Cycle options: `seconds` (for "every"), `weekdays`, `day`, `month`, `time`, `anchor`, `skip_missed`, `max_catches`
+---@return schedule.event_builder Self for method chaining
 function M:cycle(cycle_type, options)
 	self.config.cycle = {
 		type = cycle_type,
@@ -101,10 +109,11 @@ function M:cycle(cycle_type, options)
 end
 
 
----Add condition
----@param name string Condition name
----@param data any Condition data
----@return schedule.event_builder
+---Add a condition that must pass for the event to activate. Register evaluator with `schedule.register_condition()` first.
+---Multiple conditions use AND logic - all must pass. If any fails, `on_fail` is triggered.
+---@param name string Condition name (must be registered via `schedule.register_condition()`)
+---@param data any Data passed to the condition evaluator function
+---@return schedule.event_builder Self for method chaining
 function M:condition(name, data)
 	if not self.config.conditions then
 		self.config.conditions = {}
@@ -117,104 +126,115 @@ function M:condition(name, data)
 end
 
 
----Set event payload
----@param payload any
----@return schedule.event_builder
+---Set custom data payload passed to event handlers and callbacks. Included in all event notifications.
+---Store lightweight data (IDs, configuration objects). Avoid large objects or functions.
+---@param payload any Custom data object to attach to the event
+---@return schedule.event_builder Self for method chaining
 function M:payload(payload)
 	self.config.payload = payload
 	return self
 end
 
 
----Set catch up behavior
----@param catch_up boolean
----@return schedule.event_builder
+---Set whether the event should catch up on missed time when the game resumes after being offline.
+---Enable for offline progression (crafting, daily rewards). Disable for LiveOps or time-sensitive events.
+---Events with duration default to `false`; events without duration default to `true`.
+---@param catch_up boolean true to enable offline catch-up, false to disable
+---@return schedule.event_builder Self for method chaining
 function M:catch_up(catch_up)
 	self.config.catch_up = catch_up
 	return self
 end
 
 
----Set minimum time required to start
----@param min_time number
----@return schedule.event_builder
+---Set the minimum time remaining required for the event to start. If less time remains, the event is cancelled.
+---Use for LiveOps events or limited-time offers to prevent wasted activations.
+---@param min_time number Minimum seconds remaining required to start (use `schedule.DAY`, etc.)
+---@return schedule.event_builder Self for method chaining
 function M:min_time(min_time)
 	self.config.min_time = min_time
 	return self
 end
 
 
----Set on_start callback
----@param callback function
----@return schedule.event_builder
+---Set callback called once when the event activates. Use for one-time activation logic (notifications, achievements).
+---Called once per activation cycle. Use `on_enabled` for state changes that should happen during catch-up.
+---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+---@return schedule.event_builder Self for method chaining
 function M:on_start(callback)
 	self.config.on_start = callback
 	return self
 end
 
 
----Set on_enabled callback
----@param callback function
----@return schedule.event_builder
+---Set callback called whenever the event becomes active, including during offline catch-up.
+---Use for UI updates, state changes, or effects that should apply whenever the event is active.
+---Use `on_start` for one-time activation actions.
+---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+---@return schedule.event_builder Self for method chaining
 function M:on_enabled(callback)
 	self.config.on_enabled = callback
 	return self
 end
 
 
----Set on_disabled callback
----@param callback function
----@return schedule.event_builder
+---Set callback called when the event becomes inactive. Use for cleanup, UI updates, or state changes.
+---Paired with `on_enabled` to manage active state. Use to toggle UI elements or enable/disable features.
+---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+---@return schedule.event_builder Self for method chaining
 function M:on_disabled(callback)
 	self.config.on_disabled = callback
 	return self
 end
 
 
----Set on_end callback
----@param callback function
----@return schedule.event_builder
+---Set callback called when the event completes naturally. Use for completion rewards, notifications, or achievements.
+---Called when duration expires or end time is reached. Use `on_disabled` for general cleanup on any deactivation.
+---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+---@return schedule.event_builder Self for method chaining
 function M:on_end(callback)
 	self.config.on_end = callback
 	return self
 end
 
 
----Set on_fail callback or action
----@param on_fail string|function "cancel", "abort", or function
----@return schedule.event_builder
+---Set callback or action to handle condition failures. `"cancel"` permanently cancels (won't retry),
+---`"abort"` temporarily aborts (will retry when conditions pass), or use a function for custom logic (status becomes "failed").
+---Use "abort" for temporary failures, "cancel" for permanent failures.
+---@param on_fail string|function "cancel" to cancel permanently, "abort" to abort temporarily, or function for custom logic
+---@return schedule.event_builder Self for method chaining
 function M:on_fail(on_fail)
 	self.config.on_fail = on_fail
 	return self
 end
 
 
----Set persistent event ID
----@param id string
----@return schedule.event_builder
+---Set a persistent event ID for finding and updating existing events. Required for events that persist across sessions.
+---Allows finding events with `schedule.get(id)` and updating them by creating a new builder with the same ID.
+---Use descriptive, unique IDs (e.g., "event_new_year_2026", "craft_iron_sword_123").
+---@param id string Unique identifier for this event (must be unique across all events)
+---@return schedule.event_builder Self for method chaining
 function M:id(id)
 	self.config.id = id
 	return self
 end
 
 
----Save event and return event instance
----@return schedule.event
+---Save the event to the schedule system and return the event instance. Call as the final step after configuration.
+---Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
+---and callbacks are registered. If an existing event with the same ID exists, its state is merged.
+---Returns the builder instance, which also acts as an event object with methods like `get_time_left()`, `get_status()`.
+---@return schedule.event Event instance (builder also acts as event object)
 function M:save()
 	local time_utils = require("schedule.internal.schedule_time")
 	local current_time = time_utils.get_time()
-	
+
 	local event_id = nil
 	local existing_status = nil
-	
+
 	if self.config.id then
-		local existing_id = state.find_by_persistent_id(self.config.id)
-		if existing_id then
-			event_id = existing_id
-			existing_status = state.get_event_status(event_id)
-		else
-			event_id = self.config.id
-		end
+		event_id = self.config.id
+		existing_status = state.get_event_state(event_id)
 	else
 		event_id_counter = event_id_counter + 1
 		event_id = "schedule_" .. event_id_counter
@@ -252,7 +272,7 @@ function M:save()
 			calculated_end_time = calculated_start_time + self.config.duration
 		end
 
-		state.set_event_status(event_id, {
+		state.set_event_state(event_id, {
 			id = self.config.id,
 			status = initial_status,
 			start_time = calculated_start_time,
@@ -311,7 +331,7 @@ function M:save()
 			end
 		end
 
-		state.set_event_status(event_id, {
+		state.set_event_state(event_id, {
 			id = self.config.id,
 			status = initial_status,
 			start_time = calculated_start_time,
@@ -352,7 +372,7 @@ function M:save()
 
 	self.event_id = event_id
 
-	local event_status = state.get_event_status(event_id)
+	local event_status = state.get_event_state(event_id)
 	if event_status then
 		local event_instance = event_class.create(event_status)
 		if event_instance then

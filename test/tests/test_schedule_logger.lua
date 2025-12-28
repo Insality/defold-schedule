@@ -34,12 +34,10 @@ return function()
 			schedule = require("schedule.schedule")
 			schedule.reset_state()
 			reset_logger_state()
-			schedule.init()
 		end)
 
 		it("Should call debug when creating event", function()
 			schedule.set_logger(create_test_logger())
-			schedule.init()
 
 			assert(not debug_called, "Debug should not be called yet")
 
@@ -55,7 +53,6 @@ return function()
 
 		it("Should call warn when getting status of non-existing event", function()
 			schedule.set_logger(create_test_logger())
-			schedule.init()
 
 			assert(not warn_called, "Warn should not be called yet")
 
@@ -66,7 +63,6 @@ return function()
 
 		it("Should call error when using non-existing condition", function()
 			schedule.set_logger(create_test_logger())
-			schedule.init()
 
 			reset_logger_state()
 			assert(not error_called, "Error should not be called yet")
@@ -85,7 +81,6 @@ return function()
 
 		it("Should work without logger set", function()
 			schedule.set_logger(nil)
-			schedule.init()
 
 			local event = schedule.event()
 				:category("craft")
@@ -102,7 +97,6 @@ return function()
 			local logger2 = create_test_logger()
 
 			schedule.set_logger(logger1)
-			schedule.init()
 
 			reset_logger_state()
 			schedule.event()

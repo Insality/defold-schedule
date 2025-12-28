@@ -8,7 +8,6 @@ return function()
 			schedule = require("schedule.schedule")
 			schedule_time.set_time_function = function() return time end
 			schedule.reset_state()
-			schedule.init()
 			time = 0
 		end)
 
@@ -26,10 +25,8 @@ return function()
 			assert(state ~= nil, "State should exist")
 
 			schedule.reset_state()
-			schedule.init()
 
 			schedule.set_state(state)
-			schedule.init()
 
 			local event_info = schedule.get(event:get_id())
 			assert(event_info ~= nil, "Status should exist after state restore")
@@ -44,7 +41,6 @@ return function()
 				:save()
 
 			schedule.reset_state()
-			schedule.init()
 
 			local event_info = schedule.get(event:get_id())
 			assert(event_info == nil, "Status should not exist after reset")
@@ -69,11 +65,9 @@ return function()
 			end
 
 			schedule.reset_state()
-			schedule.init()
 
 			if saved_state then
 				schedule.set_state(saved_state)
-				schedule.init()
 
 				local event_info = schedule.get(event:get_id())
 				assert(event_info ~= nil, "Status should exist after state restore")
@@ -105,11 +99,9 @@ return function()
 			end
 
 			schedule.reset_state()
-			schedule.init()
 
 			if saved_state then
 				schedule.set_state(saved_state)
-				schedule.init()
 
 				local event_info1 = schedule.get(event1:get_id())
 				local event_info2 = schedule.get(event2:get_id())
@@ -135,9 +127,7 @@ return function()
 
 			local state = schedule.get_state()
 			schedule.reset_state()
-			schedule.init()
 			schedule.set_state(state)
-			schedule.init()
 
 			for _, event in ipairs(events) do
 				local event_info = schedule.get(event:get_id())

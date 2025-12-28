@@ -8,7 +8,7 @@ local M = {}
 
 ---Check if event can start based on chaining
 ---@param after_event_id string Event ID to chain after
----@param event_status schedule.event_status
+---@param event_status schedule.event.state
 ---@param current_time number
 ---@return boolean can_start
 ---@return number|nil start_time Calculated start time if can start
@@ -16,7 +16,7 @@ function M.can_start_chain(after_event_id, event_status, current_time)
 	if not after_event_id or type(after_event_id) ~= "string" then
 		return true, nil
 	end
-	local after_status = state.get_event_status(after_event_id)
+	local after_status = state.get_event_state(after_event_id)
 
 	if not after_status then
 		return false, nil
@@ -46,7 +46,7 @@ function M.calculate_after_time(after, current_time)
 	if type(after) == "number" then
 		return current_time + after
 	elseif type(after) == "string" then
-		local after_status = state.get_event_status(after)
+		local after_status = state.get_event_state(after)
 		if after_status and after_status.status == "completed" and after_status.end_time then
 			return after_status.end_time
 		end

@@ -13,7 +13,7 @@
 ---@field name string
 ---@field data any
 
----@class schedule.event_status
+---@class schedule.event.state
 ---@field event_id string|nil Event ID (key in state table)
 ---@field id string|nil Persistent event ID
 ---@field status "pending"|"active"|"completed"|"cancelled"|"aborted"|"failed"
@@ -36,7 +36,7 @@
 ---@field min_time number|nil Minimum time required to start
 
 ---@class schedule.state
----@field events table<string, schedule.event_status> Event ID -> status
+---@field events table<string, schedule.event.state> Event ID -> state
 ---@field last_update_time number|nil Last time update was called
 
 local M = {}
@@ -76,38 +76,25 @@ function M.set_state(new_state)
 end
 
 
----Get event status
+---Get event state
 ---@param event_id string
----@return schedule.event_status|nil
-function M.get_event_status(event_id)
+---@return schedule.event.state|nil
+function M.get_event_state(event_id)
 	return state.events[event_id]
 end
 
 
----Set event status
+---Set event state
 ---@param event_id string
----@param status schedule.event_status
-function M.set_event_status(event_id, status)
+---@param status schedule.event.state
+function M.set_event_state(event_id, status)
 	status.event_id = event_id
 	state.events[event_id] = status
 end
 
 
----Find event by persistent ID
----@param persistent_id string
----@return string|nil Event ID, nil if not found
-function M.find_by_persistent_id(persistent_id)
-	for event_id, event_status in pairs(state.events) do
-		if event_status.id == persistent_id then
-			return event_id
-		end
-	end
-	return nil
-end
-
-
 ---Get all events
----@return table<string, schedule.event_status>
+---@return table<string, schedule.event.state>
 function M.get_all_events()
 	return state.events
 end

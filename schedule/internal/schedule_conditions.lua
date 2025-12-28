@@ -20,7 +20,7 @@ end
 
 
 ---Evaluate all conditions for an event
----@param event_status schedule.event_status
+---@param event_status schedule.event.state
 ---@return boolean all_passed
 ---@return string|nil failed_condition_name
 function M.evaluate_conditions(event_status)

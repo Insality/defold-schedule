@@ -4,7 +4,6 @@
 
 ## Functions
 
-- [init](#init)
 - [reset_state](#reset_state)
 - [get_state](#get_state)
 - [set_state](#set_state)
@@ -21,18 +20,8 @@
 - [DAY](#DAY)
 - [WEEK](#WEEK)
 - [on_event](#on_event)
-- [timer_id](#timer_id)
 
 
-
-### init
-
----
-```lua
-schedule.init()
-```
-
-Initialize schedule system
 
 ### reset_state
 
@@ -92,7 +81,7 @@ Get event status
 	- `event_id` *(string)*:
 
 - **Returns:**
-	- `` *(schedule.event_status|nil)*:
+	- `` *(schedule.event.state|nil)*:
 
 ### register_condition
 
@@ -147,7 +136,4 @@ Set logger
 
 <a name="on_event"></a>
 - **on_event** (_unknown_): Global event subscription queue
-
-<a name="timer_id"></a>
-- **timer_id** (_nil_): Timer handle for update loop
 

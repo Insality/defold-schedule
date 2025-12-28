@@ -1,10 +1,9 @@
----The Defold Schedule module.
----Use this module to schedule timed events with cycles, conditions, and lifecycle management.
+---The Defold Schedule module for scheduling timed events with cycles, conditions, and lifecycle management.
+---Require at game startup, restore saved state with `set_state()` if needed, then call `update()` at your desired refresh rate.
 ---
 ---# Usage Example:
 ---```lua
 ---local schedule = require("schedule.schedule")
----schedule.init()
 ---
 ---local event_id = schedule.event()
 ---	:category("craft")
@@ -15,6 +14,10 @@
 ---
 ---schedule.on_event:subscribe(function(event)
 ---	print("Event activated:", event.id)
+---end)
+---
+---timer.delay(1/60, true, function()
+---	schedule.update()
 ---end)
 ---```
 
@@ -33,7 +36,7 @@ local event_class = require("schedule.internal.schedule_event")
 local M = {}
 
 
----Time constants
+---Time constants. Prefer these over raw numbers (e.g., `schedule.HOUR` instead of `3600`) for readability.
 M.SECOND = 1
 M.MINUTE = 60
 M.HOUR = 3600
@@ -41,10 +44,10 @@ M.DAY = 86400
 M.WEEK = 604800
 
 
----Global event subscription queue
----Events are pushed to this queue when they become active
----Subscribers can subscribe later and will receive all queued events
----Callback is fun(event: table): boolean|nil (return true to mark event as handled)
+---Global event subscription queue. Subscribe for centralized event handling across multiple categories.
+---Late subscribers receive queued events, ideal for UI that needs to catch up. Use for cross-cutting
+---concerns (logging, analytics); use lifecycle callbacks for event-specific logic.
+---Callback: `fun(event: table): boolean|nil` (return `true` to mark as handled)
 ---@class schedule.queue.on_event: queue
 ---@field push fun(_, event: table)
 ---@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): any
@@ -52,71 +55,52 @@ M.WEEK = 604800
 M.on_event = queue.create()
 
 
----Timer handle for update loop
----@type any
-M.timer_id = nil
-
-
 ---Track which events have already emitted
 local emitted_events = {}
 
 
----Initialize schedule system
-function M.init()
-	if not state.get_last_update_time() then
-		state.set_last_update_time(time_utils.get_time())
-	end
-
-	if M.timer_id then
-		timer.cancel(M.timer_id)
-	end
-	M.timer_id = timer.delay(1/60, true, M.update)
-
-	logger:info("Schedule system initialized")
-end
-
-
----Reset schedule state
+---Reset all schedule state. Clears all events, callbacks, conditions, subscriptions, and resets time tracking.
+---Use for testing or implementing a "reset game" feature.
 function M.reset_state()
 	state.reset()
 	lifecycle.reset_callbacks()
 	conditions.reset()
 	M.on_event:clear()
 	emitted_events = {}
-
-	if M.timer_id then
-		timer.cancel(M.timer_id)
-		M.timer_id = nil
-	end
 end
 
 
----Get state for serialization
----@return schedule.state
+---Get the complete schedule state for serialization. Call when saving your game to persist events.
+---Critical for offline progression. Save to your save file system and restore with `set_state()` on load.
+---@return schedule.state Complete state object suitable for serialization
 function M.get_state()
 	return state.get_state()
 end
 
 
----Set state from serialization
----@param new_state schedule.state
+---Restore schedule state from serialization. Call immediately after loading saved game data.
+---Restores all events to their previous state. The system calculates catch-up time from saved time to current time.
+---@param new_state schedule.state State object previously obtained from `get_state()`
 function M.set_state(new_state)
 	state.set_state(new_state)
 end
 
 
----Create new event builder
----@return schedule.event_builder
+---Create a new event builder for scheduling timed events. Returns a builder with fluent API.
+---Chain methods like `:category()`, `:after()`, `:duration()`, then call `:save()` to finalize.
+---Nothing happens until `:save()` is called.
+---@return schedule.event_builder Builder instance for configuring and saving the event
 function M.event()
 	return event_builder.create()
 end
 
 
----Get event info object
----@param event_id string
----@return schedule.event|nil
+---Get an event object by ID. Returns a rich event object with methods like `get_time_left()`, `get_status()`, `get_payload()`.
+---Use this for convenience methods and type-safe access. Use `get_status()` for raw state table access.
+---@param event_id string The event ID returned from `event():save()` or set via `event():id()`
+---@return schedule.event|nil Event object with query methods, or nil if event doesn't exist
 function M.get(event_id)
-	local event_status = state.get_event_status(event_id)
+	local event_status = state.get_event_state(event_id)
 	if not event_status then
 		return nil
 	end
@@ -124,27 +108,33 @@ function M.get(event_id)
 end
 
 
----Get event status (legacy function, kept for backward compatibility)
----@param event_id string
----@return schedule.event_status|nil
+---Get the raw event state table by ID. Use for direct state access or legacy compatibility.
+---Prefer `get()` for new code unless you specifically need raw state access.
+---@param event_id string The event ID to query
+---@return schedule.event.state|nil Raw event state table, or nil if event doesn't exist
 function M.get_status(event_id)
-	return state.get_event_status(event_id)
+	return state.get_event_state(event_id)
 end
 
 
----Register condition evaluator
----@param name string Condition name
----@param evaluator fun(data: any): boolean
+---Register a condition evaluator function. Call before creating events that use `:condition()`.
+---Conditions check game state (tokens, progression, inventory) before activation. Multiple conditions
+---use AND logic - all must pass. If any fails, the event's `on_fail` callback is triggered.
+---@param name string Condition name to use in `event():condition(name, data)`
+---@param evaluator fun(data: any): boolean Function that returns true if condition passes
 function M.register_condition(name, evaluator)
 	conditions.register_condition(name, evaluator)
 end
 
 
----Update schedule system
+---Update the schedule system. Call this at your desired refresh rate (e.g., in your game loop or timer callback).
+---Processes all events, handles time progression, and triggers lifecycle callbacks. Initializes time tracking on first call.
 function M.update()
 	local current_time = time_utils.get_time()
-	local last_update_time = state.get_last_update_time() or current_time
-	local any_updated = processor.update_all(current_time, M.on_event)
+	if not state.get_last_update_time() then
+		state.set_last_update_time(current_time)
+	end
+	processor.update_all(current_time, M.on_event)
 
 	local all_events = state.get_all_events()
 	for event_id, event_status in pairs(all_events) do
@@ -169,10 +159,11 @@ function M.update()
 end
 
 
----Filter events by category and/or status
----@param category string|nil Category to filter by, nil for any category
----@param status string|nil Status to filter by, nil for any status
----@return table<string, schedule.event> Table mapping event_id -> event
+---Filter events by category and/or status. Returns events matching the criteria.
+---Iterates all events, so consider caching results for large event counts.
+---@param category string|nil Category to filter by (e.g., "craft", "offer"), nil for any category
+---@param status string|nil Status to filter by ("pending", "active", "completed", etc.), nil for any status
+---@return table<string, schedule.event> Table mapping event_id -> event object
 function M.filter(category, status)
 	local result = {}
 	local all_events = state.get_all_events()
@@ -202,8 +193,9 @@ function M.filter(category, status)
 end
 
 
----Set logger
----@param logger_instance schedule.logger|table|nil
+---Set a custom logger instance. Integrates schedule logging with your game's logging system.
+---Useful for debugging, production tracking, or analytics integration. Pass nil to disable logging.
+---@param logger_instance schedule.logger|table|nil Logger object with `info`, `debug`, `error` methods, or nil to disable
 function M.set_logger(logger_instance)
 	logger.set_logger(logger_instance)
 end

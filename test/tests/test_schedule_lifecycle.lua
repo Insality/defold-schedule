@@ -8,7 +8,6 @@ return function()
 			schedule = require("schedule.schedule")
 			schedule_time.set_time_function = function() return time end
 			schedule.reset_state()
-			schedule.init()
 			time = 0
 		end)
 
@@ -183,7 +182,6 @@ return function()
 			assert(start_called, "on_start should be called for persistent event")
 
 			schedule.reset_state()
-			schedule.init()
 
 			schedule.event()
 				:category("liveops")
