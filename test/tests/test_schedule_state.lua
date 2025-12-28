@@ -142,8 +142,7 @@ return function()
 
 
 		it("Should save and restore infinity events", function()
-			local event = schedule.event()
-				:id("infinity_state_test")
+			local event = schedule.event("infinity_state_test")
 				:infinity()
 				:save()
 
@@ -170,22 +169,19 @@ return function()
 
 
 		it("Should save and restore events in all statuses", function()
-			local pending_event = schedule.event()
-				:id("pending_test")
+			local pending_event = schedule.event("pending_test")
 				:after(100)
 				:duration(50)
 				:save()
 
-			local active_event = schedule.event()
-				:id("active_test")
+			local active_event = schedule.event("active_test")
 				:duration(50)
 				:save()
 
 			schedule.update()
 			assert(active_event:get_status() == "active", "Event should be active")
 
-			local cancelled_event = schedule.event()
-				:id("cancelled_test")
+			local cancelled_event = schedule.event("cancelled_test")
 				:duration(50)
 				:save()
 
@@ -193,8 +189,7 @@ return function()
 			cancelled_event:cancel()
 			assert(cancelled_event:get_status() == "cancelled", "Event should be cancelled before save")
 
-			local paused_event = schedule.event()
-				:id("paused_test")
+			local paused_event = schedule.event("paused_test")
 				:duration(50)
 				:save()
 			schedule.update()
@@ -203,8 +198,7 @@ return function()
 
 			time = 10
 			schedule.update()
-			local completed_event = schedule.event()
-				:id("completed_test")
+			local completed_event = schedule.event("completed_test")
 				:duration(10)
 				:save()
 			schedule.update()
@@ -252,8 +246,7 @@ return function()
 
 
 		it("Should save and restore events with cycles", function()
-			local event = schedule.event()
-				:id("cycle_test")
+			local event = schedule.event("cycle_test")
 				:duration(10)
 				:cycle("every", { seconds = 20 })
 				:save()
@@ -286,13 +279,11 @@ return function()
 
 
 		it("Should save and restore events with chaining", function()
-			local event1 = schedule.event()
-				:id("chain1")
+			local event1 = schedule.event("chain1")
 				:duration(10)
 				:save()
 
-			local event2 = schedule.event()
-				:id("chain2")
+			local event2 = schedule.event("chain2")
 				:after("chain1")
 				:duration(20)
 				:save()
@@ -323,8 +314,7 @@ return function()
 
 
 		it("Should override config when event with same ID is created", function()
-			local event1 = schedule.event()
-				:id("override_test")
+			local event1 = schedule.event("override_test")
 				:category("old_category")
 				:duration(100)
 				:payload({ old = "data" })
@@ -340,8 +330,7 @@ return function()
 
 			schedule.set_state(state_copy)
 
-			local event2 = schedule.event()
-				:id("override_test")
+			local event2 = schedule.event("override_test")
 				:category("new_category")
 				:duration(200)
 				:payload({ new = "data" })
@@ -357,8 +346,7 @@ return function()
 
 
 		it("Should override all config fields when event with same ID is created", function()
-			local event1 = schedule.event()
-				:id("full_override_test")
+			local event1 = schedule.event("full_override_test")
 				:category("category1")
 				:duration(100)
 				:payload({ key1 = "value1" })
@@ -374,8 +362,7 @@ return function()
 
 			schedule.set_state(state_copy)
 
-			local event2 = schedule.event()
-				:id("full_override_test")
+			local event2 = schedule.event("full_override_test")
 				:category("category2")
 				:duration(200)
 				:payload({ key2 = "value2" })
@@ -393,8 +380,7 @@ return function()
 
 
 		it("Should use table-based save and restore", function()
-			local event = schedule.event()
-				:id("table_test")
+			local event = schedule.event("table_test")
 				:category("test")
 				:duration(50)
 				:save()
@@ -415,8 +401,7 @@ return function()
 
 
 		it("Should preserve last_update_time when restoring state", function()
-			local event = schedule.event()
-				:id("time_test")
+			local event = schedule.event("time_test")
 				:duration(50)
 				:save()
 
@@ -439,14 +424,12 @@ return function()
 
 
 		it("Should restore events after simulated game restart", function()
-			local event1 = schedule.event()
-				:id("restart_test1")
+			local event1 = schedule.event("restart_test1")
 				:after(50)
 				:duration(100)
 				:save()
 
-			local event2 = schedule.event()
-				:id("restart_test2")
+			local event2 = schedule.event("restart_test2")
 				:duration(200)
 				:save()
 

@@ -8,9 +8,10 @@ local M = {}
 ---@param after_event_id string Event ID to chain after
 ---@param event_status schedule.event.state
 ---@param current_time number
+---@param last_update_time number|nil Last update time to check if parent just completed
 ---@return boolean can_start
 ---@return number|nil start_time Calculated start time if can start
-function M.can_start_chain(after_event_id, event_status, current_time)
+function M.can_start_chain(after_event_id, event_status, current_time, last_update_time)
 	if not after_event_id or type(after_event_id) ~= "string" then
 		return true, nil
 	end
@@ -25,11 +26,14 @@ function M.can_start_chain(after_event_id, event_status, current_time)
 	end
 
 	local wait_online = event_status.after_options and event_status.after_options.wait_online
-	if wait_online == false or wait_online == nil then
+	if wait_online == true then
 		if after_status.end_time and current_time < after_status.end_time then
 			return false, nil
 		end
-		return true, after_status.end_time or current_time
+		if after_status.end_time and (not last_update_time or last_update_time < after_status.end_time) then
+			return true, after_status.end_time or current_time
+		end
+		return false, nil
 	else
 		return true, after_status.end_time or current_time
 	end

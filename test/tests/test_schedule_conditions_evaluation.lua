@@ -11,7 +11,7 @@ return function()
 			time = 0
 		end)
 
-		it("Should evaluate conditions for pending events even before start_time is reached", function()
+		it("Should evaluate conditions when event is about to start", function()
 			local condition_called = false
 
 			schedule.register_condition("test_condition", function(data)
@@ -30,7 +30,11 @@ return function()
 
 			time = 10
 			schedule.update()
-			assert(condition_called, "Condition should be evaluated even before start_time")
+			assert(not condition_called, "Condition should not be evaluated before start_time")
+
+			time = 100
+			schedule.update()
+			assert(condition_called, "Condition should be evaluated when event is about to start")
 		end)
 
 
@@ -46,7 +50,7 @@ return function()
 				:after(60)
 				:duration(120)
 				:condition("dynamic_condition", {})
-				:on_fail("abort")
+				:abort_on_fail()
 				:save()
 
 			time = 60
@@ -74,7 +78,7 @@ return function()
 				:after(60)
 				:duration(120)
 				:condition("count_condition", {})
-				:on_fail("abort")
+				:abort_on_fail()
 				:save()
 
 			time = 60
@@ -89,9 +93,7 @@ return function()
 		end)
 
 
-		it("Should set status to failed when on_fail is custom function", function()
-			local fail_called = false
-
+		it("Should set status to aborted when abort_on_fail is set", function()
 			schedule.register_condition("always_false", function(data)
 				return false
 			end)
@@ -101,15 +103,12 @@ return function()
 				:after(60)
 				:duration(120)
 				:condition("always_false", {})
-				:on_fail(function(event_data)
-					fail_called = true
-				end)
+				:abort_on_fail()
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(fail_called, "on_fail callback should be called")
-			assert(event:get_status() == "failed", "Status should be failed when on_fail is custom function")
+			assert(event:get_status() == "aborted", "Status should be aborted when abort_on_fail is set")
 		end)
 
 

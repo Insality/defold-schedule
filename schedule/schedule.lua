@@ -55,10 +55,6 @@ M.WEEK = 604800
 M.on_event = queue.create()
 
 
----Track which events have already emitted
-local emitted_events = {}
-
-
 ---Reset all schedule state. Clears all events, callbacks, conditions, subscriptions, and resets time tracking.
 ---Use for testing or implementing a "reset game" feature.
 function M.reset_state()
@@ -66,7 +62,6 @@ function M.reset_state()
 	lifecycle.reset_callbacks()
 	conditions.reset()
 	M.on_event:clear()
-	emitted_events = {}
 	time.set_time_function(nil)
 end
 
@@ -121,7 +116,7 @@ end
 
 ---Register a condition evaluator function. Call before creating events that use `:condition()`.
 ---Conditions check game state (tokens, progression, inventory) before activation. Multiple conditions
----use AND logic - all must pass. If any fails, the event's `on_fail` callback is triggered.
+---use AND logic - all must pass. If any fails and `abort_on_fail()` is set, event status becomes "aborted" and will not retry.
 ---@param name string Condition name to use in `event():condition(name, data)`
 ---@param evaluator fun(data: any): boolean Function that returns true if condition passes
 function M.register_condition(name, evaluator)
@@ -133,31 +128,37 @@ end
 ---Processes all events, handles time progression, and triggers lifecycle callbacks. Initializes time tracking on first call.
 function M.update()
 	local current_time = time.get_time()
-	if not state.get_last_update_time() then
+	local was_first_update = not state.get_last_update_time()
+	if was_first_update then
 		state.set_last_update_time(current_time)
 	end
-	processor.update_all(current_time, M.on_event)
 
-	local all_events = state.get_all_events()
-	for event_id, event_status in pairs(all_events) do
-		if event_status.status == "active" then
-			local emit_key = event_id .. "_" .. (event_status.start_time or 0) .. "_" .. (event_status.cycle_count or 0)
-			if not emitted_events[emit_key] and event_status.start_time and current_time >= event_status.start_time then
-				emitted_events[emit_key] = true
+	if was_first_update then
+		local all_events = state.get_all_events()
+		for event_id, event_status in pairs(all_events) do
+			if event_status.status == "active" then
+				local event_data = {
+					id = event_id,
+					category = event_status.category,
+					payload = event_status.payload,
+					status = "active",
+					start_time = event_status.start_time,
+					end_time = event_status.end_time
+				}
+				lifecycle.on_enabled(event_id, event_data)
 				M.on_event:push({
 					id = event_id,
 					category = event_status.category,
 					payload = event_status.payload,
-					status = event_status.status,
+					status = "active",
 					start_time = event_status.start_time,
 					end_time = event_status.end_time
 				})
 			end
-		elseif event_status.status ~= "active" then
-			local emit_key = event_id .. "_" .. (event_status.start_time or 0) .. "_" .. (event_status.cycle_count or 0)
-			emitted_events[emit_key] = nil
 		end
 	end
+
+	processor.update_all(current_time, M.on_event)
 end
 
 

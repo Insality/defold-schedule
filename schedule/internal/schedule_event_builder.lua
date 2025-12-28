@@ -2,7 +2,7 @@ local state = require("schedule.internal.schedule_state")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
 local logger = require("schedule.internal.schedule_logger")
 local event = require("schedule.internal.schedule_event")
-local time_utils = require("schedule.internal.schedule_time")
+local time = require("schedule.internal.schedule_time")
 
 local event_id_counter = 0
 
@@ -35,7 +35,7 @@ end
 
 ---Set event to start after a relative delay or after another event completes (event chaining).
 ---Use for relative timing or sequential events. Use `start_at()` for absolute calendar-based timing.
----Set `wait_online = true` in options to wait for player to be online before starting chained events.
+---Set `wait_online = true` in options to wait for first update() call after parent completes (starts counting after player is online, don't include offline time); if false/nil, starts immediately when parent completes.
 ---@param after number|string Seconds to wait (number) or event ID to chain after (string)
 ---@param options table|nil Options table with `wait_online` (boolean) for chaining behavior
 ---@return schedule.event_builder Self for method chaining
@@ -114,7 +114,7 @@ end
 
 
 ---Add a condition that must pass for the event to activate. Register evaluator with `schedule.register_condition()` first.
----Multiple conditions use AND logic - all must pass. If any fails, `on_fail` is triggered.
+---Multiple conditions use AND logic - all must pass. If any fails and `abort_on_fail()` is set, event status becomes "aborted" and will not retry.
 ---@param name string Condition name (must be registered via `schedule.register_condition()`)
 ---@param data any Data passed to the condition evaluator function
 ---@return schedule.event_builder Self for method chaining
@@ -202,26 +202,14 @@ function M:on_end(callback)
 end
 
 
----Set callback or action to handle condition failures. `"cancel"` permanently cancels (won't retry),
----`"abort"` temporarily aborts (will retry when conditions pass), or use a function for custom logic (status becomes "failed").
----Use "abort" for temporary failures, "cancel" for permanent failures.
----@param on_fail string|function "cancel" to cancel permanently, "abort" to abort temporarily, or function for custom logic
+---Set flag to abort event when conditions fail. When conditions fail, event status will be set to "aborted" and will not retry.
 ---@return schedule.event_builder Self for method chaining
-function M:on_fail(on_fail)
-	self.config.on_fail = on_fail
+function M:abort_on_fail()
+	self.config.abort_on_fail = true
 	return self
 end
 
 
----Set a persistent event ID for finding and updating existing events. Required for events that persist across sessions.
----Allows finding events with `schedule.get(id)` and updating them by creating a new builder with the same ID.
----Use descriptive, unique IDs (e.g., "event_new_year_2026", "craft_iron_sword_123").
----@param id string Unique identifier for this event (must be unique across all events)
----@return schedule.event_builder Self for method chaining
-function M:id(id)
-	self.config.id = id
-	return self
-end
 
 
 ---Save the event to the schedule system and return the event instance. Call as the final step after configuration.
@@ -230,7 +218,7 @@ end
 ---Returns the builder instance, which also acts as an event object with methods like `get_time_left()`, `get_status()`.
 ---@return schedule.event Event instance (builder also acts as event object)
 function M:save()
-	local current_time = time_utils.get_time()
+	local current_time = time.get_time()
 
 	local event_id = nil
 	local existing_status = nil
@@ -253,7 +241,7 @@ function M:save()
 		if self.config.start_at then
 			local start_at = self.config.start_at
 			if type(start_at) == "string" then
-				calculated_start_time = time_utils.parse_iso_date(start_at)
+				calculated_start_time = time.parse_iso_date(start_at)
 			elseif type(start_at) == "number" then
 				calculated_start_time = start_at
 			end
@@ -267,7 +255,7 @@ function M:save()
 		if self.config.end_at then
 			local end_at = self.config.end_at
 			if type(end_at) == "string" then
-				calculated_end_time = time_utils.parse_iso_date(end_at)
+				calculated_end_time = time.parse_iso_date(end_at)
 			elseif type(end_at) == "number" then
 				calculated_end_time = end_at
 			end
@@ -293,6 +281,7 @@ function M:save()
 			infinity = self.config.infinity ~= nil and self.config.infinity or existing_status.infinity,
 			cycle = self.config.cycle or existing_status.cycle,
 			conditions = self.config.conditions or existing_status.conditions,
+			abort_on_fail = self.config.abort_on_fail ~= nil and self.config.abort_on_fail or existing_status.abort_on_fail,
 			catch_up = self.config.catch_up ~= nil and self.config.catch_up or existing_status.catch_up,
 			min_time = self.config.min_time or existing_status.min_time
 		})
@@ -304,7 +293,7 @@ function M:save()
 		if self.config.start_at then
 			local start_at = self.config.start_at
 			if type(start_at) == "string" then
-				calculated_start_time = time_utils.parse_iso_date(start_at)
+				calculated_start_time = time.parse_iso_date(start_at)
 			elseif type(start_at) == "number" then
 				calculated_start_time = start_at
 			end
@@ -320,7 +309,7 @@ function M:save()
 		if self.config.end_at then
 			local end_at = self.config.end_at
 			if type(end_at) == "string" then
-				calculated_end_time = time_utils.parse_iso_date(end_at)
+				calculated_end_time = time.parse_iso_date(end_at)
 			elseif type(end_at) == "number" then
 				calculated_end_time = end_at
 			end
@@ -352,6 +341,7 @@ function M:save()
 			infinity = self.config.infinity,
 			cycle = self.config.cycle,
 			conditions = self.config.conditions,
+			abort_on_fail = self.config.abort_on_fail,
 			catch_up = self.config.catch_up,
 			min_time = self.config.min_time
 		})
@@ -368,9 +358,6 @@ function M:save()
 	end
 	if self.config.on_end then
 		lifecycle.register_callback(event_id, "on_end", self.config.on_end)
-	end
-	if self.config.on_fail then
-		lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
 	end
 
 	self.event_id = event_id

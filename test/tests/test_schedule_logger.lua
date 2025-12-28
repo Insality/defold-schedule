@@ -1,6 +1,8 @@
 return function()
 	describe("Schedule Logger", function()
 		local schedule ---@type schedule
+		local schedule_time = require("schedule.internal.schedule_time")
+		local time = 0
 
 		local debug_called = false
 		local warn_called = false
@@ -33,6 +35,8 @@ return function()
 		before(function()
 			schedule = require("schedule.schedule")
 			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
+			time = 0
 			reset_logger_state()
 		end)
 
@@ -75,7 +79,11 @@ return function()
 				:save()
 
 			schedule.update()
-			assert(error_called, "Error should be called for non-existing condition")
+			assert(not error_called, "Error should not be called before start_time")
+
+			time = 60
+			schedule.update()
+			assert(error_called, "Error should be called for non-existing condition when event is about to start")
 		end)
 
 

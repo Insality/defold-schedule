@@ -13,7 +13,7 @@ local callbacks = {}
 
 ---Register callback for event
 ---@param event_id string
----@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_fail"
+---@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"
 ---@param callback function|string|nil
 function M.register_callback(event_id, callback_type, callback)
 	if not callbacks[event_id] then
@@ -25,7 +25,7 @@ end
 
 ---Get callback for event
 ---@param event_id string
----@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_fail"
+---@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"
 ---@return function|string|nil
 function M.get_callback(event_id, callback_type)
 	if not callbacks[event_id] then
@@ -116,28 +116,6 @@ function M.on_end(event_id, event_data)
 end
 
 
----Trigger on_fail callback
----@param event_id string
----@param event_data table
----@return string|nil action "cancel", "abort", or nil
-function M.on_fail(event_id, event_data)
-	logger:info("Lifecycle: on_fail", { event_id = event_id, category = event_data.category })
-	local on_fail_value = M.get_callback(event_id, "on_fail")
-	if not on_fail_value then
-		return nil
-	end
-
-	local on_fail_type = type(on_fail_value)
-
-	if on_fail_type == "string" then
-		return on_fail_value
-	elseif on_fail_type == "function" then
-		M.call_callback(on_fail_value, event_data, "on_fail")
-		return nil
-	end
-
-	return nil
-end
 
 
 return M

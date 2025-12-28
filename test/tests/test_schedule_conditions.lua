@@ -25,8 +25,9 @@ return function()
 				:condition("test_condition", { value = 100 })
 				:save()
 
+			time = 60
 			schedule.update()
-			assert(condition_called, "Condition should be called")
+			assert(condition_called, "Condition should be called when event is about to start")
 		end)
 
 
@@ -63,8 +64,7 @@ return function()
 		end)
 
 
-		it("Should cancel event when condition fails with on_fail cancel", function()
-			local fail_called = false
+		it("Should abort event when condition fails with abort_on_fail", function()
 			schedule.register_condition("always_false", function(data)
 				return false
 			end)
@@ -74,22 +74,16 @@ return function()
 				:after(60)
 				:duration(3600)
 				:condition("always_false", {})
-				:on_fail("cancel")
-				:on_fail(function(event_data)
-					fail_called = true
-				end)
+				:abort_on_fail()
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(fail_called, "on_fail callback should be called")
-
-			assert(event:get_status() == "cancelled" or event:get_status() == "failed", "Event should be cancelled or failed")
+			assert(event:get_status() == "aborted", "Event should be aborted")
 		end)
 
 
-		it("Should abort event when condition fails with on_fail abort", function()
-			local fail_called = false
+		it("Should abort event when condition fails with abort_on_fail", function()
 			schedule.register_condition("always_false", function(data)
 				return false
 			end)
@@ -99,17 +93,12 @@ return function()
 				:after(60)
 				:duration(3600)
 				:condition("always_false", {})
-				:on_fail("abort")
-				:on_fail(function(event_data)
-					fail_called = true
-				end)
+				:abort_on_fail()
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(fail_called, "on_fail callback should be called")
-
-			assert(event:get_status() == "aborted" or event:get_status() == "failed", "Event should be aborted or failed")
+			assert(event:get_status() == "aborted", "Event should be aborted")
 		end)
 
 

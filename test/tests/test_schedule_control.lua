@@ -125,7 +125,7 @@ return function()
 			local event = schedule.event()
 				:duration(50)
 				:condition("always_false", {})
-				:on_fail("abort")
+				:abort_on_fail()
 				:save()
 
 			schedule.update()

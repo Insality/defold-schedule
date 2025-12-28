@@ -105,8 +105,7 @@ return function()
 
 
 		it("Should save and restore infinity event state", function()
-			local event = schedule.event()
-				:id("infinity_test")
+			local event = schedule.event("infinity_test")
 				:infinity()
 				:save()
 
@@ -139,13 +138,11 @@ return function()
 
 
 		it("Should handle infinity event with chaining", function()
-			local event1 = schedule.event()
-				:id("chain_start")
+			local event1 = schedule.event("chain_start")
 				:duration(10)
 				:save()
 
-			local event2 = schedule.event()
-				:id("chain_infinity")
+			local event2 = schedule.event("chain_infinity")
 				:after("chain_start")
 				:infinity()
 				:save()

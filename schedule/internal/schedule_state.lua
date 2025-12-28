@@ -32,6 +32,7 @@
 ---@field infinity boolean|nil Event never ends
 ---@field cycle schedule.cycle_config|nil
 ---@field conditions schedule.condition_data[]|nil
+---@field abort_on_fail boolean|nil If true, set status to "aborted" when conditions fail (event will not retry)
 ---@field catch_up boolean|nil
 ---@field min_time number|nil Minimum time required to start
 

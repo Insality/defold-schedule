@@ -192,9 +192,8 @@ schedule.event()
 ```lua
 local schedule = require("schedule.schedule")
 
-schedule.event()
+schedule.event("event_new_year")
 	:category("liveops")
-	:id("event_new_year") -- Required for persistent event to set handlers for the same event
 	:start_at("2026-01-01T00:00:00")
 	:duration(7 * schedule.DAY)
 	:catch_up(false) -- do not catch up if missed
@@ -212,9 +211,7 @@ schedule.event()
 	:on_end(function(event) -- When event is ended
 		print("Event ended: " .. event.id)
 	end)
-	:on_fail(function(event) -- When event fails condition
-		print("Event failed: " .. event.id)
-	end)
+	:abort_on_fail() -- When event fails condition, set status to "aborted"
 	:save()
 ```
 
@@ -223,9 +220,8 @@ schedule.event()
 ```lua
 local schedule = require("schedule.schedule")
 
-local event_id = schedule.event()
+local event_id = schedule.event("event_first_week")
 	:category("liveops")
-	:id("event_first_week") -- Will find the stored event with this ID to keep event data
 	:duration(7 * schedule.DAY)
 	:save()
 ```

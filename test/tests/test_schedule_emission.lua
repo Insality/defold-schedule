@@ -38,7 +38,7 @@ return function()
 		end)
 
 
-		it("Should emit events with unique emit keys based on cycle_count", function()
+		it("Should emit events on each cycle activation", function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
@@ -63,11 +63,11 @@ return function()
 
 			time = 160
 			schedule.update()
-			assert(emission_count == 2, "Second cycle should emit with new cycle_count")
+			assert(emission_count == 2, "Second cycle should emit when event becomes active again")
 		end)
 
 
-		it("Should clear emit keys when event status changes away from active", function()
+		it("Should emit events when reactivated after completion", function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
@@ -98,14 +98,13 @@ return function()
 		end)
 
 
-		it("Should use emit key with event_id, start_time, and cycle_count", function()
+		it("Should emit multiple events when they become active", function()
 			local emissions = {}
 
 			schedule.on_event:subscribe(function(event)
 				table.insert(emissions, {
 					id = event.id,
-					start_time = event.start_time,
-					cycle_count = event.cycle_count
+					start_time = event.start_time
 				})
 				return true
 			end)

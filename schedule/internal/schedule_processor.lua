@@ -12,8 +12,9 @@ local M = {}
 ---Calculate event start time
 ---@param event_status schedule.event.state
 ---@param current_time number
+---@param last_update_time number|nil Last update time for wait_online logic
 ---@return number|nil start_time Calculated start time in seconds, or nil if cannot be calculated
-function M.calculate_start_time(event_status, current_time)
+function M.calculate_start_time(event_status, current_time, last_update_time)
 	if event_status.start_at then
 		local start_at = event_status.start_at
 		if type(start_at) == "string" then
@@ -25,7 +26,7 @@ function M.calculate_start_time(event_status, current_time)
 	elseif event_status.after then
 		local after = event_status.after
 		if type(after) == "string" then
-			local can_start, chain_time = chaining.can_start_chain(after, event_status, current_time)
+			local can_start, chain_time = chaining.can_start_chain(after, event_status, current_time, last_update_time)
 			if can_start and chain_time then
 				return chain_time
 			end
@@ -68,8 +69,9 @@ end
 ---@param event_id string
 ---@param event_status schedule.event.state
 ---@param current_time number
+---@param last_update_time number|nil Last update time for wait_online logic
 ---@return boolean should_start True if event should start, false otherwise
-function M.should_start_event(event_id, event_status, current_time)
+function M.should_start_event(event_id, event_status, current_time, last_update_time)
 	if not M._is_startable_status(event_status.status) then
 		return false
 	end
@@ -86,7 +88,7 @@ function M.should_start_event(event_id, event_status, current_time)
 	if type(event_status.after) == "string" then
 		local after_event_id = event_status.after
 		assert(type(after_event_id) == "string", "after_event_id must be string")
-		local can_start, chain_time = chaining.can_start_chain(after_event_id, event_status, current_time)
+		local can_start, chain_time = chaining.can_start_chain(after_event_id, event_status, current_time, last_update_time)
 		if not can_start then
 			return false
 		end
@@ -97,15 +99,8 @@ function M.should_start_event(event_id, event_status, current_time)
 
 	local all_conditions_passed, failed_condition = conditions.evaluate_conditions(event_status)
 	if not all_conditions_passed then
-		local event_data = M._create_event_data(event_id, event_status)
-		local fail_action = lifecycle.on_fail(event_id, event_data)
-		if fail_action == "cancel" then
-			M._cancel_event(event_id, event_status)
-		elseif fail_action == "abort" then
+		if event_status.abort_on_fail then
 			event_status.status = "aborted"
-			state.set_event_state(event_id, event_status)
-		else
-			event_status.status = "failed"
 			state.set_event_state(event_id, event_status)
 		end
 		return false
@@ -344,6 +339,17 @@ function M.process_cycle(event_id, event_status, current_time, event_queue)
 				event_status.next_cycle_time = nil
 				state.set_event_state(event_id, event_status)
 
+				if event_queue then
+					event_queue:push({
+						id = event_id,
+						category = event_status.category,
+						payload = event_status.payload,
+						status = "active",
+						start_time = new_start_time,
+						end_time = new_end_time
+					})
+				end
+
 				M._update_chained_events(event_id)
 
 				local event_data = M._create_event_data(event_id, event_status)
@@ -382,7 +388,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 
 		local start_time = event_status.start_time
 		if not start_time then
-			start_time = M.calculate_start_time(event_status, current_time)
+			start_time = M.calculate_start_time(event_status, current_time, last_update_time)
 			if start_time then
 				event_status.start_time = start_time
 				state.set_event_state(event_id, event_status)
@@ -418,7 +424,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 				end
 			end
 
-			local should_start = M.should_start_event(event_id, event_status, current_time)
+			local should_start = M.should_start_event(event_id, event_status, current_time, last_update_time)
 			if should_start then
 				local end_time = M.calculate_end_time(event_status, start_time)
 				M._activate_event(event_id, event_status, start_time, end_time, current_time, event_queue)
@@ -441,8 +447,6 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 					state.set_event_state(event_id, event_status)
 				end
 			end
-		elseif start_time and event_status.conditions and #event_status.conditions > 0 then
-			conditions.evaluate_conditions(event_status)
 		end
 	end
 
@@ -593,6 +597,17 @@ function M._activate_event(event_id, event_status, start_time, end_time, current
 	event_status.end_time = end_time
 	event_status.last_update_time = current_time
 	state.set_event_state(event_id, event_status)
+
+	if event_queue then
+		event_queue:push({
+			id = event_id,
+			category = event_status.category,
+			payload = event_status.payload,
+			status = "active",
+			start_time = start_time,
+			end_time = end_time
+		})
+	end
 
 	local event_data = M._create_event_data(event_id, event_status)
 	M._trigger_event_start(event_id, event_data)

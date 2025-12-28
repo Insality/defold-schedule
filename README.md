@@ -91,7 +91,7 @@ schedule.event()
 	:min_time(time) -- Do not start if not enough time left
 	-- Conditions
 	:condition(condition_name, data)
-	:on_fail("cancel|abort")
+	:abort_on_fail() -- Abort event when conditions fail
 	-- Repeat
 	:cycle("every", { seconds = 60, anchor = "start|end", skip_missed = true })
 	:cycle("weekly", { weekdays = {"sun"}, time = "HH:MM", skip_missed = true })

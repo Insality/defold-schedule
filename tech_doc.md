@@ -6,9 +6,9 @@
 - Processing order: processor.update_all() → event emission to global queue
 - Processor order per event: catch-up → start time calculation → activation checks → completion checks → cycle processing → chaining updates
 - Maintains global event queue (`on_event`) for cross-cutting concerns
-- Events emitted to global queue after processor completes, when status = "active" and start_time is reached
-- Emit tracking uses key (event_id + start_time + cycle_count) to prevent duplicate emissions
-- Emit keys cleared when event status changes away from "active"
+- Events emitted to global queue when status changes to "active" (pushed during activation in processor)
+- On game restart: all active events are emitted to queue and `on_enabled` is called (but NOT `on_start`) on first update after `set_state()`
+- On game restart: all active events are emitted to queue and `on_enabled` is called (but NOT `on_start`) on first update after `set_state()`
 - Tracks last update time for catch-up calculations
 - State is fully serializable for save/load
 - Events are stored in memory and processed on each `update()` call
@@ -34,7 +34,7 @@
 - Event chaining: `after(event_id)` waits for referenced event to complete
 - Chained events start when parent event's end_time is reached
 - Chain validation checks parent event exists and status = "completed"
-- `wait_online` option: if false/nil, waits for parent's end_time to pass; if true, starts immediately when parent completes
+- `wait_online` option: if true, waits for first `update()` call after parent completes (starts counting after player is online, don't include offline time); if false/nil, starts immediately when parent completes
 - Start time recalculated when parent event completes
 - Processor updates all chained events in a loop until no more updates occur
 - Chained events reset start_time to nil when parent reactivates (for cycling events)
@@ -45,7 +45,7 @@
 - ISO date strings parsed to Unix timestamps (YYYY-MM-DDTHH:MM:SS)
 - Event activates when current_time >= start_time
 - Used for calendar-based scheduling (LiveOps, promotions)
-- Takes precedence over `after()` if both specified
+- Takes precedence over `after()` if both specified (
 
 ## End Time
 
@@ -125,7 +125,7 @@
 
 ## Persistence ID
 
-- Events can have explicit ID via `id(string)` or `event(id)`
+- Events can have explicit ID via `event(id)` - pass ID as parameter to `event()` function
 - ID required for finding events with `schedule.get(id)`
 - IDs must be unique across all events
 - Without ID, auto-generated ID created (schedule_1, schedule_2, etc.)
@@ -155,26 +155,27 @@
 - Events can have multiple conditions via `condition(name, data)`
 - All conditions must pass (AND logic) for event to activate
 - Evaluated in `should_start_event` before activation
-- Also evaluated for pending events even before start_time is reached
-- If condition fails, `on_fail` callback triggered
-- `on_fail` can return "cancel" (permanent, status = "cancelled"), "abort" (temporary, status = "aborted"), or custom function (status = "failed")
+- If condition fails and `abort_on_fail()` is set, event status becomes "aborted" and will not retry
 - Failed conditions prevent activation until conditions pass
 - Conditions re-evaluated when event status changes back to startable (cancelled/aborted/failed → pending)
 - If conditions pass after failure, status automatically changes to "pending"
 
 ## Lifecycle Callbacks
 
-- `on_start`: Called when event activates (including during catch-up cycles)
-- `on_enabled`: Called whenever event becomes active (including catch-up)
+- `on_start`: Called when event activates (status changes to "active") - only on actual activation, not on game restart
+- `on_enabled`: Called whenever the event becomes active, including:
+  - When event first activates (after on_start)
+  - During catch-up cycles
+  - On game restart if event was already active (called for all active events on first update after `set_state()`)
 - `on_disabled`: Called when event becomes inactive
 - `on_end`: Called when event completes naturally
-- `on_fail`: Called when conditions fail, can return action string ("cancel", "abort", or nil)
 - Callbacks stored in memory only (not serialized with state)
 - Callbacks receive event data: {id, category, payload, status, start_time, end_time}
 - Callbacks wrapped in pcall for error handling (errors logged, don't crash system)
 - During catch-up cycles, `_trigger_event_cycle` calls: on_start → on_enabled → on_end → on_disabled
 - Normal activation calls: on_start → on_enabled; completion calls: on_end → on_disabled
-- Use on_start for one-time actions, on_enabled for state changes that should apply during catch-up
+- On game restart: active events get on_enabled (but NOT on_start) and are emitted to queue on first update
+- Use on_start for one-time actions, on_enabled for state changes that should apply whenever event is active
 
 ## Min Time
 

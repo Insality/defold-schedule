@@ -104,10 +104,7 @@ return function()
 		end)
 
 
-		it("Should call on_fail callback", function()
-			local fail_called = false
-			local fail_event = nil
-
+		it("Should abort event when condition fails with abort_on_fail", function()
 			schedule.register_condition("always_false", function(data)
 				return false
 			end)
@@ -117,16 +114,12 @@ return function()
 				:after(60)
 				:duration(120)
 				:condition("always_false", {})
-				:on_fail(function(event_data)
-					fail_called = true
-					fail_event = event_data
-				end)
+				:abort_on_fail()
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(fail_called, "on_fail should be called when condition fails")
-			assert(fail_event ~= nil, "Event should be passed to callback")
+			assert(event:get_status() == "aborted", "abort_on_fail should set status to aborted when condition fails")
 		end)
 
 
@@ -167,9 +160,8 @@ return function()
 			local start_called = false
 			local event_id = "persistent_event"
 
-			schedule.event()
+			schedule.event(event_id)
 				:category("liveops")
-				:id(event_id)
 				:after(60)
 				:duration(120)
 				:on_start(function(event)
@@ -184,9 +176,8 @@ return function()
 			schedule.reset_state()
 			schedule_time.set_time_function(function() return time end)
 
-			schedule.event()
+			schedule.event(event_id)
 				:category("liveops")
-				:id(event_id)
 				:after(60)
 				:duration(120)
 				:on_start(function(event)

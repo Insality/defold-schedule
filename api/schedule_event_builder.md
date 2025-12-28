@@ -20,8 +20,7 @@
 - [on_enabled](#on_enabled)
 - [on_disabled](#on_disabled)
 - [on_end](#on_end)
-- [on_fail](#on_fail)
-- [id](#id)
+- [abort_on_fail](#abort_on_fail)
 - [save](#save)
 ## Fields
 
@@ -273,32 +272,14 @@ Set on_end callback
 - **Returns:**
 	- `` *(schedule.event_builder)*:
 
-### on_fail
+### abort_on_fail
 
 ---
 ```lua
-event_builder:on_fail(on_fail)
+event_builder:abort_on_fail()
 ```
 
-Set on_fail callback or action
-
-- **Parameters:**
-	- `on_fail` *(string|function)*: "cancel", "abort", or function
-
-- **Returns:**
-	- `` *(schedule.event_builder)*:
-
-### id
-
----
-```lua
-event_builder:id(id)
-```
-
-Set persistent event ID
-
-- **Parameters:**
-	- `id` *(string)*:
+Set flag to abort event when conditions fail. When conditions fail, event status will be set to "aborted" (will retry when conditions pass).
 
 - **Returns:**
 	- `` *(schedule.event_builder)*:
