@@ -16,13 +16,13 @@ return function()
 			local start_called = false
 			local start_event = nil
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(120)
-				:on_start(function(event)
+				:on_start(function(event_data)
 					start_called = true
-					start_event = event
+					start_event = event_data
 				end)
 				:save()
 
@@ -30,7 +30,7 @@ return function()
 			schedule.update()
 			assert(start_called, "on_start should be called")
 			assert(start_event ~= nil, "Event should be passed to callback")
-			assert(start_event.id == event_id, "Event ID should match")
+			assert(start_event.id == event:get_id(), "Event ID should match")
 		end)
 
 
@@ -38,13 +38,13 @@ return function()
 			local enabled_called = false
 			local enabled_event = nil
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(120)
-				:on_enabled(function(event)
+				:on_enabled(function(event_data)
 					enabled_called = true
-					enabled_event = event
+					enabled_event = event_data
 				end)
 				:save()
 
@@ -59,13 +59,13 @@ return function()
 			local disabled_called = false
 			local disabled_event = nil
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(120)
-				:on_disabled(function(event)
+				:on_disabled(function(event_data)
 					disabled_called = true
-					disabled_event = event
+					disabled_event = event_data
 				end)
 				:save()
 
@@ -84,13 +84,13 @@ return function()
 			local end_called = false
 			local end_event = nil
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(120)
-				:on_end(function(event)
+				:on_end(function(event_data)
 					end_called = true
-					end_event = event
+					end_event = event_data
 				end)
 				:save()
 
@@ -113,14 +113,14 @@ return function()
 				return false
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("offer")
 				:after(60)
 				:duration(120)
 				:condition("always_false", {})
-				:on_fail(function(event)
+				:on_fail(function(event_data)
 					fail_called = true
-					fail_event = event
+					fail_event = event_data
 				end)
 				:save()
 
@@ -134,20 +134,20 @@ return function()
 		it("Should call callbacks in correct order", function()
 			local callback_order = {}
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(120)
-				:on_start(function(event)
+				:on_start(function(event_data)
 					table.insert(callback_order, "start")
 				end)
-				:on_enabled(function(event)
+				:on_enabled(function(event_data)
 					table.insert(callback_order, "enabled")
 				end)
-				:on_end(function(event)
+				:on_end(function(event_data)
 					table.insert(callback_order, "end")
 				end)
-				:on_disabled(function(event)
+				:on_disabled(function(event_data)
 					table.insert(callback_order, "disabled")
 				end)
 				:save()

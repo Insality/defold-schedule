@@ -87,14 +87,13 @@ return function()
 			schedule.set_logger(nil)
 			schedule.init()
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
 				:save()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist even without logger")
+			assert(event ~= nil, "Status should exist even without logger")
 		end)
 
 

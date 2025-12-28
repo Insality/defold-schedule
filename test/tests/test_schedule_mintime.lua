@@ -13,7 +13,7 @@ return function()
 		end)
 
 		it("Should prevent event start if not enough time left", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
 				:duration(86400)
@@ -22,20 +22,16 @@ return function()
 
 			time = 50
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "pending", "Event should be pending before start_at")
+			assert(event:get_status() == "pending", "Event should be pending before start_at")
 
 			time = 100
 			schedule.update()
-			event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "pending" or event_info:get_status() == "cancelled", "Event should not start if not enough time left")
+			assert(event:get_status() == "pending" or event:get_status() == "cancelled", "Event should not start if not enough time left")
 		end)
 
 
 		it("Should allow event start if enough time left", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
 				:duration(86400)
@@ -44,13 +40,12 @@ return function()
 
 			time = 100
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should handle min_time with duration events", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(86400)
@@ -59,13 +54,12 @@ return function()
 
 			time = 60
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should handle min_time with cycle events", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(86400)
@@ -75,13 +69,12 @@ return function()
 
 			time = 60
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should handle min_time edge cases", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
 				:duration(100)
@@ -90,13 +83,12 @@ return function()
 
 			time = 100
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist with exact min_time")
+			assert(event ~= nil, "Status should exist with exact min_time")
 		end)
 
 
 		it("Should handle min_time with very short duration", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
 				:duration(1)
@@ -105,13 +97,12 @@ return function()
 
 			time = 100
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should handle min_time with infinity events", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("liveops")
 				:start_at(100)
 				:infinity()
@@ -120,8 +111,7 @@ return function()
 
 			time = 100
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 	end)
 end

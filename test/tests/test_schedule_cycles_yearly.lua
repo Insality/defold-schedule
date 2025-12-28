@@ -13,38 +13,35 @@ return function()
 		end)
 
 		it("Should cycle yearly on specified month and day", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("yearly_event")
 				:cycle("yearly", { month = 1, day = 1, time = "00:00", skip_missed = true })
 				:duration(86400)
 				:save()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should cycle yearly with specific time", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("yearly_event")
 				:cycle("yearly", { month = 12, day = 25, time = "12:00", skip_missed = true })
 				:duration(3600)
 				:save()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should handle February 29 edge case", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("yearly_event")
 				:cycle("yearly", { month = 2, day = 29, time = "00:00", skip_missed = true })
 				:duration(86400)
 				:save()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
@@ -65,40 +62,37 @@ return function()
 			}
 
 			for _, test_case in ipairs(test_cases) do
-				local event_id = schedule.event()
+				local event = schedule.event()
 					:category("yearly_event")
 					:cycle("yearly", { month = test_case.month, day = test_case.day, time = "00:00", skip_missed = true })
 					:duration(86400)
 					:save()
 
-				local event_info = schedule.get(event_id)
-				assert(event_info ~= nil, "Status should exist for month " .. test_case.month .. " day " .. test_case.day)
+				assert(event ~= nil, "Status should exist for month " .. test_case.month .. " day " .. test_case.day)
 			end
 		end)
 
 
 		it("Should skip missed yearly cycles when skip_missed is true", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("yearly_event")
 				:cycle("yearly", { month = 1, day = 1, time = "00:00", skip_missed = true })
 				:duration(86400)
 				:save()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should handle all months", function()
 			for month = 1, 12 do
-				local event_id = schedule.event()
+				local event = schedule.event()
 					:category("yearly_event")
 					:cycle("yearly", { month = month, day = 1, time = "00:00", skip_missed = true })
 					:duration(86400)
 					:save()
 
-				local event_info = schedule.get(event_id)
-				assert(event_info ~= nil, "Status should exist for month " .. month)
+				assert(event ~= nil, "Status should exist for month " .. month)
 			end
 		end)
 	end)

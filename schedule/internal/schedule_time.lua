@@ -12,7 +12,10 @@ M.set_time_function = nil
 ---@return number
 function M.get_time()
 	if M.set_time_function then
-		return M.set_time_function()
+		local time = M.set_time_function()
+		if time then
+			return time
+		end
 	end
 	return socket.gettime()
 end

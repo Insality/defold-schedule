@@ -21,24 +21,24 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1)
+				:after(craft_1:get_id())
 				:duration(120)
 				:save()
 
 			time = 30
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "pending")
-			assert(schedule.get(craft_2):get_status() == "pending")
+			assert(craft_1:get_status() == "pending")
+			assert(craft_2:get_status() == "pending")
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
-			assert(schedule.get(craft_2):get_status() == "pending")
+			assert(craft_1:get_status() == "active")
+			assert(craft_2:get_status() == "pending")
 
 			time = 180
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			assert(schedule.get(craft_2):get_status() == "active", "Second event should start after first completes")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active", "Second event should start after first completes")
 		end)
 
 
@@ -51,18 +51,18 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = false })
+				:after(craft_1:get_id(), { wait_online = false })
 				:duration(120)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
+			assert(craft_1:get_status() == "active")
 
 			time = 180
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			assert(schedule.get(craft_2):get_status() == "active", "Second event should start after first completes")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active", "Second event should start after first completes")
 		end)
 
 
@@ -75,22 +75,20 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1)
+				:after(craft_1:get_id())
 				:duration(120)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
-			assert(schedule.get(craft_2):get_status() == "pending")
+			assert(craft_1:get_status() == "active")
+			assert(craft_2:get_status() == "pending")
 
 			time = 500
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			local craft_2_info = schedule.get(craft_2)
-			assert(craft_2_info ~= nil, "Event info should exist")
-			assert(craft_2_info:get_status() == "active", "Second event should start after first completes")
-			assert(craft_2_info:get_start_time() == 180, "Second event should start at first event end time")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active", "Second event should start after first completes")
+			assert(craft_2:get_start_time() == 180, "Second event should start at first event end time")
 		end)
 
 
@@ -103,21 +101,19 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = false })
+				:after(craft_1:get_id(), { wait_online = false })
 				:duration(120)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
+			assert(craft_1:get_status() == "active")
 
 			time = 500
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			local craft_2_info = schedule.get(craft_2)
-			assert(craft_2_info ~= nil, "Event info should exist")
-			assert(craft_2_info:get_status() == "active", "Second event should start after update")
-			assert(craft_2_info:get_start_time() == 180, "Second event should start at first event end time")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active", "Second event should start after update")
+			assert(craft_2:get_start_time() == 180, "Second event should start at first event end time")
 		end)
 
 
@@ -130,26 +126,22 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = true })
+				:after(craft_1:get_id(), { wait_online = true })
 				:duration(120)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
+			assert(craft_1:get_status() == "active")
 
 			time = 120
 			schedule.update()
-			local craft_1_info = schedule.get(craft_1)
-			local craft_2_info = schedule.get(craft_2)
-			assert(craft_1_info ~= nil, "Event info should exist")
-			assert(craft_2_info ~= nil, "Event info should exist")
-			assert(craft_1_info:get_status() == "completed")
-			assert(craft_2_info:get_status() == "active")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active")
 
 			time = 240
 			schedule.update()
-			assert(craft_2_info:get_status() == "completed")
+			assert(craft_2:get_status() == "completed")
 		end)
 
 
@@ -163,27 +155,27 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = true })
+				:after(craft_1:get_id(), { wait_online = true })
 				:duration(60)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
+			assert(craft_1:get_status() == "active")
 
 			time = 120
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			assert(schedule.get(craft_2):get_status() == "active")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active")
 
 			time = 180
 			schedule.update()
-			assert(schedule.get(craft_2):get_status() == "completed")
+			assert(craft_2:get_status() == "completed")
 
 			time = 260
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active", "First event should cycle")
-			assert(schedule.get(craft_2):get_status() == "pending", "Second event should wait for first again")
+			assert(craft_1:get_status() == "active", "First event should cycle")
+			assert(craft_2:get_status() == "pending", "Second event should wait for first again")
 		end)
 
 
@@ -196,17 +188,17 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = true })
+				:after(craft_1:get_id(), { wait_online = true })
 				:duration(120)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
+			assert(craft_1:get_status() == "active")
 
 			time = 90
 			schedule.update()
-			assert(schedule.get(craft_2):get_status() == "pending", "Second event should still be pending")
+			assert(craft_2:get_status() == "pending", "Second event should still be pending")
 		end)
 
 
@@ -219,42 +211,36 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = true })
+				:after(craft_1:get_id(), { wait_online = true })
 				:duration(60)
 				:save()
 
 			local craft_3 = schedule.event()
 				:category("craft")
-				:after(craft_2, { wait_online = true })
+				:after(craft_2:get_id(), { wait_online = true })
 				:duration(60)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
-			assert(schedule.get(craft_2):get_status() == "pending")
-			assert(schedule.get(craft_3):get_status() == "pending")
+			assert(craft_1:get_status() == "active")
+			assert(craft_2:get_status() == "pending")
+			assert(craft_3:get_status() == "pending")
 
 			time = 120
 			schedule.update()
-			local craft_1_info = schedule.get(craft_1)
-			local craft_2_info = schedule.get(craft_2)
-			local craft_3_info = schedule.get(craft_3)
-			assert(craft_1_info ~= nil, "Event info should exist")
-			assert(craft_2_info ~= nil, "Event info should exist")
-			assert(craft_3_info ~= nil, "Event info should exist")
-			assert(craft_1_info:get_status() == "completed")
-			assert(craft_2_info:get_status() == "active")
-			assert(craft_3_info:get_status() == "pending")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active")
+			assert(craft_3:get_status() == "pending")
 
 			time = 180
 			schedule.update()
-			assert(schedule.get(craft_2):get_status() == "completed")
-			assert(schedule.get(craft_3):get_status() == "active")
+			assert(craft_2:get_status() == "completed")
+			assert(craft_3:get_status() == "active")
 
 			time = 240
 			schedule.update()
-			assert(schedule.get(craft_3):get_status() == "completed")
+			assert(craft_3:get_status() == "completed")
 		end)
 
 
@@ -267,19 +253,19 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1, { wait_online = true })
+				:after(craft_1:get_id(), { wait_online = true })
 				:duration(120)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "active")
-			assert(schedule.get(craft_2):get_status() == "pending")
+			assert(craft_1:get_status() == "active")
+			assert(craft_2:get_status() == "pending")
 
 			time = 180
 			schedule.update()
-			assert(schedule.get(craft_1):get_status() == "completed")
-			assert(schedule.get(craft_2):get_status() == "active", "Second event should start immediately when wait_online is true")
+			assert(craft_1:get_status() == "completed")
+			assert(craft_2:get_status() == "active", "Second event should start immediately when wait_online is true")
 		end)
 	end)
 end

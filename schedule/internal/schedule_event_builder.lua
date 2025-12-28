@@ -1,22 +1,22 @@
 local config = require("schedule.internal.schedule_config")
 local logger = require("schedule.internal.schedule_logger")
+local event_class = require("schedule.internal.schedule_event")
 
 local event_id_counter = 0
 
 ---@class schedule.event_builder
 ---@field config schedule.event_config
+---@field event_id string|nil
 local M = {}
 
 
 ---Create new event builder
 ---@return schedule.event_builder
 function M.create()
-	---@type schedule.event_builder
-	local builder = {
-		config = {}
-	}
-	setmetatable(builder, { __index = M })
-	return builder
+	local self = setmetatable({}, { __index = M })
+	self.config = {}
+	self.event_id = nil
+	return self
 end
 
 
@@ -197,8 +197,8 @@ function M:id(id)
 end
 
 
----Save event and return event ID
----@return string event_id
+---Save event and return event instance
+---@return schedule.event_builder
 function M:save()
 	local event_id = nil
 	if self.config.id then
@@ -281,8 +281,30 @@ function M:save()
 		})
 	end
 
+	self.event_id = event_id
+
+	local event_instance = event_class.create(event_id)
+	if event_instance then
+		setmetatable(self, {
+			__index = function(t, k)
+				if M[k] then
+					return M[k]
+				end
+				local method = event_instance[k]
+				if method and type(method) == "function" then
+					return function(...)
+						local args = {...}
+						args[1] = event_instance
+						return method(unpack(args))
+					end
+				end
+				return method
+			end
+		})
+	end
+
 	logger:debug("Event saved", { event_id = event_id, category = self.config.category })
-	return event_id
+	return self
 end
 
 

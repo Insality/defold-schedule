@@ -36,15 +36,14 @@ return function()
 				return data.level >= 5
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("offer")
 				:after(60)
 				:duration(3600)
 				:condition("has_level", { level = 5 })
 				:save()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
@@ -53,7 +52,7 @@ return function()
 				return data.amount >= 100
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("offer")
 				:after(60)
 				:duration(3600)
@@ -61,8 +60,7 @@ return function()
 				:condition("has_token", { token_id = "level", amount = 4 })
 				:save()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
@@ -72,13 +70,13 @@ return function()
 				return false
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("offer")
 				:after(60)
 				:duration(3600)
 				:condition("always_false", {})
 				:on_fail("cancel")
-				:on_fail(function(event)
+				:on_fail(function(event_data)
 					fail_called = true
 				end)
 				:save()
@@ -87,9 +85,7 @@ return function()
 			schedule.update()
 			assert(fail_called, "on_fail callback should be called")
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "cancelled" or event_info:get_status() == "failed", "Event should be cancelled or failed")
+			assert(event:get_status() == "cancelled" or event:get_status() == "failed", "Event should be cancelled or failed")
 		end)
 
 
@@ -99,13 +95,13 @@ return function()
 				return false
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("offer")
 				:after(60)
 				:duration(3600)
 				:condition("always_false", {})
 				:on_fail("abort")
-				:on_fail(function(event)
+				:on_fail(function(event_data)
 					fail_called = true
 				end)
 				:save()
@@ -114,9 +110,7 @@ return function()
 			schedule.update()
 			assert(fail_called, "on_fail callback should be called")
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "aborted" or event_info:get_status() == "failed", "Event should be aborted or failed")
+			assert(event:get_status() == "aborted" or event:get_status() == "failed", "Event should be aborted or failed")
 		end)
 
 
@@ -126,7 +120,7 @@ return function()
 				return condition_value
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("offer")
 				:after(60)
 				:duration(3600)
@@ -135,15 +129,11 @@ return function()
 
 			time = 60
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			local initial_status = event_info:get_status()
+			local initial_status = event:get_status()
 
 			condition_value = true
 			schedule.update()
-			event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() ~= initial_status or event_info:get_status() == "active", "Status should change when condition becomes true")
+			assert(event:get_status() ~= initial_status or event:get_status() == "active", "Status should change when condition becomes true")
 		end)
 	end)
 end

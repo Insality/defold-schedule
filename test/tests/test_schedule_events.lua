@@ -22,7 +22,7 @@ return function()
 				return true
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -32,7 +32,7 @@ return function()
 			schedule.update()
 			assert(event_received, "Event should be received")
 			assert(received_event ~= nil, "Event should be passed to subscriber")
-			assert(received_event.id == event_id, "Event ID should match")
+			assert(received_event.id == event:get_id(), "Event ID should match")
 		end)
 
 
@@ -52,13 +52,13 @@ return function()
 				return false
 			end)
 
-			local craft_id = schedule.event()
+			local craft_event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
 				:save()
 
-			local offer_id = schedule.event()
+			local offer_event = schedule.event()
 				:category("offer")
 				:after(60)
 				:duration(120)
@@ -80,7 +80,7 @@ return function()
 			end)
 
 			local payload = { building_id = "crafting_table", item_id = "iron_shovel", quantity = 1 }
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -109,7 +109,7 @@ return function()
 				return true
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -129,7 +129,7 @@ return function()
 				return true
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -167,7 +167,7 @@ return function()
 				return true
 			end)
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)

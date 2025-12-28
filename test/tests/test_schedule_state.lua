@@ -13,7 +13,7 @@ return function()
 		end)
 
 		it("Should get and set state", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -31,13 +31,13 @@ return function()
 			schedule.set_state(state)
 			schedule.init()
 
-			local event_info = schedule.get(event_id)
+			local event_info = schedule.get(event:get_id())
 			assert(event_info ~= nil, "Status should exist after state restore")
 		end)
 
 
 		it("Should reset state", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -46,13 +46,13 @@ return function()
 			schedule.reset_state()
 			schedule.init()
 
-			local event_info = schedule.get(event_id)
+			local event_info = schedule.get(event:get_id())
 			assert(event_info == nil, "Status should not exist after reset")
 		end)
 
 
 		it("Should persist state across game restarts", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -75,7 +75,7 @@ return function()
 				schedule.set_state(saved_state)
 				schedule.init()
 
-				local event_info = schedule.get(event_id)
+				local event_info = schedule.get(event:get_id())
 				assert(event_info ~= nil, "Status should exist after state restore")
 			end
 		end)
@@ -111,8 +111,8 @@ return function()
 				schedule.set_state(saved_state)
 				schedule.init()
 
-				local event_info1 = schedule.get(event1)
-				local event_info2 = schedule.get(event2)
+				local event_info1 = schedule.get(event1:get_id())
+				local event_info2 = schedule.get(event2:get_id())
 				assert(event_info1 ~= nil, "First event status should exist")
 				assert(event_info2 ~= nil, "Second event status should exist")
 			end
@@ -120,14 +120,14 @@ return function()
 
 
 		it("Should handle state with multiple events", function()
-			local event_ids = {}
+			local events = {}
 			for i = 1, 5 do
-				local event_id = schedule.event()
+				local event = schedule.event()
 					:category("craft")
 					:after(60 * i)
 					:duration(120)
 					:save()
-				table.insert(event_ids, event_id)
+				table.insert(events, event)
 			end
 
 			time = 300
@@ -139,9 +139,9 @@ return function()
 			schedule.set_state(state)
 			schedule.init()
 
-			for _, event_id in ipairs(event_ids) do
-				local event_info = schedule.get(event_id)
-				assert(event_info ~= nil, "Status should exist for event " .. event_id)
+			for _, event in ipairs(events) do
+				local event_info = schedule.get(event:get_id())
+				assert(event_info ~= nil, "Status should exist for event " .. event:get_id())
 			end
 		end)
 	end)

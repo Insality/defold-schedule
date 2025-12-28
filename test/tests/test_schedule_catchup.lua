@@ -15,7 +15,7 @@ return function()
 		it("Should catch up missed events when catch_up is true", function()
 			local count = 0
 
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("reward")
 				:after(60)
 				:duration(1)
@@ -29,16 +29,12 @@ return function()
 			time = 60
 			schedule.update()
 			assert(count == 1, "on_start should be called")
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "active", "Event should be active")
+			assert(event:get_status() == "active", "Event should be active")
 
 			time = 1000
 			schedule.update()
 			assert(count > 5, "on_start should be called multiple times")
-			event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "completed", "Event should be completed after catch up")
+			assert(event:get_status() == "completed", "Event should be completed after catch up")
 		end)
 
 
@@ -69,7 +65,7 @@ return function()
 
 
 		it("Should catch up with duration events", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -79,9 +75,7 @@ return function()
 			time = 1000
 			schedule.update()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "completed", "Event should be completed after catch up")
+			assert(event:get_status() == "completed", "Event should be completed after catch up")
 		end)
 
 
@@ -113,7 +107,7 @@ return function()
 
 
 		it("Should simulate offline progression", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -122,18 +116,16 @@ return function()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get(event_id):get_status() == "active", "Event should be active")
+			assert(event:get_status() == "active", "Event should be active")
 
 			time = 10000
 			schedule.update()
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Event info should exist")
-			assert(event_info:get_status() == "completed", "Event should complete after offline period")
+			assert(event:get_status() == "completed", "Event should complete after offline period")
 		end)
 
 
 		it("Should handle catch_up default behavior with duration", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("craft")
 				:after(60)
 				:duration(120)
@@ -142,13 +134,12 @@ return function()
 			time = 1000
 			schedule.update()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 
 
 		it("Should handle catch_up default behavior without duration", function()
-			local event_id = schedule.event()
+			local event = schedule.event()
 				:category("reward")
 				:after(60)
 				:save()
@@ -156,8 +147,7 @@ return function()
 			time = 1000
 			schedule.update()
 
-			local event_info = schedule.get(event_id)
-			assert(event_info ~= nil, "Status should exist")
+			assert(event ~= nil, "Status should exist")
 		end)
 	end)
 end
