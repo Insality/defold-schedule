@@ -4,16 +4,12 @@ return function()
 		local schedule_time = require("schedule.internal.schedule_time")
 		local time = 0
 
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule_time.set_time_function = function() return time end
-		schedule.reset_state()
-		schedule.init()
-		time = 0
-	end)
-
-		after(function()
-			schedule.update()
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule_time.set_time_function = function() return time end
+			schedule.reset_state()
+			schedule.init()
+			time = 0
 		end)
 
 		it("Should subscribe to events", function()
@@ -32,7 +28,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(event_received, "Event should be received")
 			assert(received_event ~= nil, "Event should be passed to subscriber")
@@ -68,7 +64,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(craft_count == 1, "Craft event should be received")
 			assert(offer_count == 1, "Offer event should be received")
@@ -91,7 +87,7 @@ return function()
 				:payload(payload)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(received_payload ~= nil, "Payload should be received")
 			assert(received_payload.building_id == "crafting_table", "Payload should contain building_id")
@@ -119,7 +115,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(subscriber1_called, "First subscriber should be called")
 			assert(subscriber2_called, "Second subscriber should be called")
@@ -139,7 +135,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(call_count == 1, "Subscriber should be called once")
 
@@ -151,7 +147,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =120)
+			time = 120
 			schedule.update()
 			assert(call_count == 1, "Subscriber should not be called after unsubscribe")
 		end)
@@ -177,7 +173,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(subscriber1_called, "First subscriber should be called")
 			assert(subscriber2_called, "Second subscriber should still be called")

@@ -25,17 +25,17 @@ return function()
 				:duration(120)
 				:save()
 
-			time =30)
+			time = 30
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "pending")
 			assert(schedule.get(craft_2):get_status() == "pending")
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "active")
 			assert(schedule.get(craft_2):get_status() == "pending")
 
-			time =180)
+			time = 180
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "completed")
 			assert(schedule.get(craft_2):get_status() == "active", "Second event should start after first completes")
@@ -55,11 +55,11 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "active")
 
-			time =180)
+			time = 180
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "completed")
 			assert(schedule.get(craft_2):get_status() == "active", "Second event should start after first completes")
@@ -79,16 +79,16 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "active")
 
-			time =120)
+			time = 120
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "completed")
 			assert(schedule.get(craft_2):get_status() == "active")
 
-			time =240)
+			time = 240
 			schedule.update()
 			assert(schedule.get(craft_2):get_status() == "completed")
 		end)
@@ -108,20 +108,20 @@ return function()
 				:duration(60)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "active")
 
-			time =120)
+			time = 120
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "completed")
 			assert(schedule.get(craft_2):get_status() == "active")
 
-			time =180)
+			time = 180
 			schedule.update()
 			assert(schedule.get(craft_2):get_status() == "completed")
 
-			time =260)
+			time = 260
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "active", "First event should cycle")
 			assert(schedule.get(craft_2):get_status() == "pending", "Second event should wait for first again")
@@ -141,11 +141,11 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "active")
 
-			time =90)
+			time = 90
 			schedule.update()
 			assert(schedule.get(craft_2):get_status() == "pending", "Second event should still be pending")
 		end)
@@ -170,24 +170,24 @@ return function()
 				:duration(60)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "active")
 			assert(schedule.get(craft_2):get_status() == "pending")
 			assert(schedule.get(craft_3):get_status() == "pending")
 
-			time =120)
+			time = 120
 			schedule.update()
 			assert(schedule.get(craft_1):get_status() == "completed")
 			assert(schedule.get(craft_2):get_status() == "active")
 			assert(schedule.get(craft_3):get_status() == "pending")
 
-			time =180)
+			time = 180
 			schedule.update()
 			assert(schedule.get(craft_2):get_status() == "completed")
 			assert(schedule.get(craft_3):get_status() == "active")
 
-			time =240)
+			time = 240
 			schedule.update()
 			assert(schedule.get(craft_3):get_status() == "completed")
 		end)

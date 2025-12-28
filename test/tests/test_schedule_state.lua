@@ -4,16 +4,12 @@ return function()
 		local schedule_time = require("schedule.internal.schedule_time")
 		local time = 0
 
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule_time.set_time_function = function() return time end
-		schedule.reset_state()
-		schedule.init()
-		time = 0
-	end)
-
-		after(function()
-			schedule.update()
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule_time.set_time_function = function() return time end
+			schedule.reset_state()
+			schedule.init()
+			time = 0
 		end)
 
 		it("Should get and set state", function()
@@ -23,7 +19,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 
 			local state = schedule.get_state()
@@ -62,7 +58,7 @@ return function()
 				:duration(120)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 
 			local state = schedule.get_state()
@@ -98,7 +94,7 @@ return function()
 				:duration(200)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 
 			local state = schedule.get_state()
@@ -134,7 +130,7 @@ return function()
 				table.insert(event_ids, event_id)
 			end
 
-			time =300)
+			time = 300
 			schedule.update()
 
 			local state = schedule.get_state()

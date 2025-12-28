@@ -4,16 +4,12 @@ return function()
 		local schedule_time = require("schedule.internal.schedule_time")
 		local time = 0
 
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule_time.set_time_function = function() return time end
-		schedule.reset_state()
-		schedule.init()
-		time = 0
-	end)
-
-		after(function()
-			schedule.update()
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule_time.set_time_function = function() return time end
+			schedule.reset_state()
+			schedule.init()
+			time = 0
 		end)
 
 		it("Should cycle yearly on specified month and day", function()

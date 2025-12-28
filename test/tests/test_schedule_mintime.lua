@@ -4,16 +4,12 @@ return function()
 		local schedule_time = require("schedule.internal.schedule_time")
 		local time = 0
 
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule_time.set_time_function = function() return time end
-		schedule.reset_state()
-		schedule.init()
-		time = 0
-	end)
-
-		after(function()
-			schedule.update()
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule_time.set_time_function = function() return time end
+			schedule.reset_state()
+			schedule.init()
+			time = 0
 		end)
 
 		it("Should prevent event start if not enough time left", function()
@@ -24,12 +20,12 @@ return function()
 				:min_time(86400)
 				:save()
 
-			time =50)
+			time = 50
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			assert(event_info:get_status() == "pending", "Event should be pending before start_at")
 
-			time =100)
+			time = 100
 			schedule.update()
 			event_info = schedule.get(event_id)
 			assert(event_info:get_status() == "pending" or event_info:get_status() == "cancelled", "Event should not start if not enough time left")
@@ -44,7 +40,7 @@ return function()
 				:min_time(86400)
 				:save()
 
-			time =100)
+			time = 100
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			assert(event_info ~= nil, "Status should exist")
@@ -59,7 +55,7 @@ return function()
 				:min_time(86400)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			assert(event_info ~= nil, "Status should exist")
@@ -75,7 +71,7 @@ return function()
 				:min_time(86400)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			assert(event_info ~= nil, "Status should exist")
@@ -90,7 +86,7 @@ return function()
 				:min_time(100)
 				:save()
 
-			time =100)
+			time = 100
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			assert(event_info ~= nil, "Status should exist with exact min_time")
@@ -105,7 +101,7 @@ return function()
 				:min_time(1)
 				:save()
 
-			time =100)
+			time = 100
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			assert(event_info ~= nil, "Status should exist")
@@ -120,7 +116,7 @@ return function()
 				:min_time(86400)
 				:save()
 
-			time =100)
+			time = 100
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			assert(event_info ~= nil, "Status should exist")

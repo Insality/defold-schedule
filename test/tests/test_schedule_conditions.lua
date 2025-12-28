@@ -83,7 +83,7 @@ return function()
 				end)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(fail_called, "on_fail callback should be called")
 
@@ -109,7 +109,7 @@ return function()
 				end)
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			assert(fail_called, "on_fail callback should be called")
 
@@ -131,7 +131,7 @@ return function()
 				:condition("dynamic_condition", {})
 				:save()
 
-			time =60)
+			time = 60
 			schedule.update()
 			local event_info = schedule.get(event_id)
 			local initial_status = event_info:get_status()

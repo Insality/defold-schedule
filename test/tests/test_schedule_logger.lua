@@ -27,15 +27,15 @@ return function()
 				error = function(_, message, context)
 					error_called = true
 				end,
-			}
-		end
+		}
+	end
 
-	before(function()
-		schedule = require("schedule.schedule")
-		schedule.reset_state()
-		reset_logger_state()
-		schedule.init()
-	end)
+		before(function()
+			schedule = require("schedule.schedule")
+			schedule.reset_state()
+			reset_logger_state()
+			schedule.init()
+		end)
 
 		it("Should call debug when creating event", function()
 			schedule.set_logger(create_test_logger())
