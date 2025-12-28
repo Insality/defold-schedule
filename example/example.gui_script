@@ -1,41 +1,41 @@
+local saver = require("saver.saver")
+local schedule = require("schedule.schedule")
+local druid = require("druid.druid")
+local debug_page_schedule = require("widget.debug_page_schedule.debug_page_schedule")
+local properties_panel = require("widget.properties_panel.properties_panel")
+
 function init(self)
-	-- Add initialization code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
+	self.druid = druid.new(self)
+
+	saver.init()
+	saver.bind_save_state("schedule", schedule.get_state())
+
+	self.properties_panel = self.druid:new_widget(properties_panel, "properties_panel")
+	self.properties_panel:add_button(function(button)
+		button:set_text_property("Schedule Panel")
+		button:set_text_button("Open")
+		button.button.on_click:subscribe(function()
+			debug_page_schedule.render_properties_panel(self.druid, self.properties_panel)
+		end)
+	end)
 end
+
 
 function final(self)
-	-- Add finalization code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
+	self.druid:final()
 end
 
+
 function update(self, dt)
-	-- Add update code here
-	-- Learn more: https://defold.com/manuals/script/
-	-- Remove this function if not needed
+	self.druid:update(dt)
 end
 
 function on_message(self, message_id, message, sender)
-	-- Add message-handling code here
-	-- Learn more: https://defold.com/manuals/message-passing/
-	-- Remove this function if not needed
+	self.druid:on_message(message_id, message, sender)
 end
+
 
 function on_input(self, action_id, action)
-	-- Add input-handling code here. The game object this script is attached to
-	-- must have acquired input focus:
-	--
-	--    msg.post(".", "acquire_input_focus")
-	--
-	-- All mapped input bindings will be received. Mouse and touch input will
-	-- be received regardless of where on the screen it happened.
-	-- Learn more: https://defold.com/manuals/input/
-	-- Remove this function if not needed
+	self.druid:on_input(action_id, action)
 end
 
-function on_reload(self)
-	-- Add reload-handling code here
-	-- Learn more: https://defold.com/manuals/hot-reload/
-	-- Remove this function if not needed
-end

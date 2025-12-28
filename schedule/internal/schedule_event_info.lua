@@ -85,11 +85,11 @@ function M:get_time_to_start()
 	local status = self:get_status()
 	local current_time = time_utils.get_time()
 
-	if status == "active" or status == "completed" then
+	if status == "completed" then
 		return 0
 	end
 
-	if status == "pending" then
+	if status == "pending" or status == "active" then
 		if not self.event_status or not self.event_status.start_time then
 			return 0
 		end
