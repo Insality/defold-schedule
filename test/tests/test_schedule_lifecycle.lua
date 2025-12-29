@@ -217,7 +217,6 @@ return function()
 
 			assert(table.concat(event_types, ","):find("start"), "Should have start event")
 			assert(table.concat(event_types, ","):find("enabled"), "Should have enabled event")
-			assert(table.concat(event_types, ","):find("active"), "Should have active event")
 
 			time = 180
 			schedule.update()
@@ -393,18 +392,18 @@ return function()
 			end
 
 			local has_start = false
-			local has_active = false
+			local has_enabled = false
 			for _, etype in ipairs(event_types) do
 				if etype == "start" then
 					has_start = true
 				end
-				if etype == "active" then
-					has_active = true
+				if etype == "enabled" then
+					has_enabled = true
 				end
 			end
 
 			assert(not has_start, "Should not have start events on state restore")
-			assert(has_active, "Should have active events on state restore")
+			assert(has_enabled, "Should have enabled events on state restore")
 		end)
 
 
@@ -465,14 +464,14 @@ return function()
 
 			schedule.update()
 
-			local active_count = 0
+			local enabled_count = 0
 			for _, e in ipairs(events) do
-				if e.callback_type == "active" then
-					active_count = active_count + 1
+				if e.callback_type == "enabled" then
+					enabled_count = enabled_count + 1
 				end
 			end
 
-			assert(active_count == 2, "Should have 2 active events on restore")
+			assert(enabled_count == 2, "Should have 2 enabled events on restore")
 		end)
 	end)
 end

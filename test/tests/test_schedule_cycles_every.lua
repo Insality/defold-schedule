@@ -106,7 +106,7 @@ return function()
 				:save()
 
 			schedule.on_event:subscribe(function(event_data)
-				if event_data.id == event:get_id() and event_data.callback_type == "active" then
+				if event_data.id == event:get_id() and event_data.callback_type == "enabled" then
 					trigger_count = trigger_count + 1
 				end
 				return true

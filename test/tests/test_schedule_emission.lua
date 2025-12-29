@@ -15,7 +15,7 @@ return function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
-				if event.callback_type == "active" then
+				if event.callback_type == "enabled" then
 					emission_count = emission_count + 1
 				end
 				return true
@@ -44,7 +44,7 @@ return function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
-				if event.callback_type == "active" then
+				if event.callback_type == "enabled" then
 					emission_count = emission_count + 1
 				end
 				return true
@@ -75,7 +75,7 @@ return function()
 			local emission_count = 0
 
 			schedule.on_event:subscribe(function(event)
-				if event.callback_type == "active" then
+				if event.callback_type == "enabled" then
 					emission_count = emission_count + 1
 				end
 				return true
@@ -108,7 +108,7 @@ return function()
 			local emissions = {}
 
 			schedule.on_event:subscribe(function(event)
-				if event.callback_type == "active" then
+				if event.callback_type == "enabled" then
 					table.insert(emissions, {
 						id = event.id,
 						start_time = event.start_time
@@ -141,7 +141,7 @@ return function()
 			local emission_order = {}
 
 			schedule.on_event:subscribe(function(event)
-				if event.callback_type == "active" then
+				if event.callback_type == "enabled" then
 					table.insert(emission_order, "emission")
 				end
 				return true
