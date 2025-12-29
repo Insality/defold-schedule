@@ -113,7 +113,7 @@ function M.should_start_event(event_id, event_state, current_time, last_update_t
 		if end_time then
 			local remaining = end_time - current_time
 			if remaining <= event_state.min_time then
-				M._cancel_event(event_id, event_state)
+				event_state.status = "cancelled"
 				return false
 			end
 		end
@@ -144,8 +144,13 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 					event_state.start_time = start_time
 					event_state.end_time = end_time
 					state.set_event_state(event_id, event_state)
+
 					local event_data = M._create_event_data(event_id, event_state)
-					M._trigger_event_cycle(event_id, event_data)
+					lifecycle.on_start(event_id, event_data)
+					lifecycle.on_enabled(event_id, event_data)
+					lifecycle.on_end(event_id, event_data)
+					lifecycle.on_disabled(event_id, event_data)
+
 					event_state.status = "completed"
 					event_state.start_time = start_time
 					event_state.end_time = end_time
@@ -256,7 +261,8 @@ function M.process_cycle(event_id, event_state, current_time)
 							M._update_chained_events(event_id)
 
 							local event_data = M._create_event_data(event_id, event_state)
-							M._trigger_event_start(event_id, event_data)
+							lifecycle.on_start(event_id, event_data)
+							lifecycle.on_enabled(event_id, event_data)
 
 							if current_time >= new_end_time then
 								M._complete_event(event_id, event_state, new_start_time, new_end_time, current_time)
@@ -325,7 +331,9 @@ function M.process_cycle(event_id, event_state, current_time)
 				M._update_chained_events(event_id)
 
 				local event_data = M._create_event_data(event_id, event_state)
-				M._trigger_event_start(event_id, event_data)
+				lifecycle.on_start(event_id, event_data)
+				lifecycle.on_enabled(event_id, event_data)
+
 				return true
 			end
 		end
@@ -389,7 +397,7 @@ function M.update_event(event_id, current_time, last_update_time)
 				if end_time then
 					local remaining = end_time - current_time
 					if remaining <= event_state.min_time then
-						M._cancel_event(event_id, event_state)
+						event_state.status = "cancelled"
 						return false
 					end
 				end
@@ -514,35 +522,6 @@ function M._create_event_data(event_id, event_state)
 end
 
 
----Trigger event start lifecycle callbacks
----@param event_id string
----@param event_data table
-function M._trigger_event_start(event_id, event_data)
-	lifecycle.on_start(event_id, event_data)
-	lifecycle.on_enabled(event_id, event_data)
-end
-
-
----Trigger event end lifecycle callbacks
----@param event_id string
----@param event_data table
-function M._trigger_event_end(event_id, event_data)
-	lifecycle.on_end(event_id, event_data)
-	lifecycle.on_disabled(event_id, event_data)
-end
-
-
----Trigger full cycle lifecycle callbacks
----@param event_id string
----@param event_data table
-function M._trigger_event_cycle(event_id, event_data)
-	lifecycle.on_start(event_id, event_data)
-	lifecycle.on_enabled(event_id, event_data)
-	lifecycle.on_end(event_id, event_data)
-	lifecycle.on_disabled(event_id, event_data)
-end
-
-
 ---Activate an event
 ---@param event_id string
 ---@param event_state schedule.event.state
@@ -557,7 +536,8 @@ function M._activate_event(event_id, event_state, start_time, end_time, current_
 	state.set_event_state(event_id, event_state)
 
 	local event_data = M._create_event_data(event_id, event_state)
-	M._trigger_event_start(event_id, event_data)
+	lifecycle.on_start(event_id, event_data)
+	lifecycle.on_enabled(event_id, event_data)
 end
 
 
@@ -579,16 +559,8 @@ function M._complete_event(event_id, event_state, start_time, end_time, current_
 	state.set_event_state(event_id, event_state)
 
 	local event_data = M._create_event_data(event_id, event_state)
-	M._trigger_event_end(event_id, event_data)
-end
-
-
----Cancel an event
----@param event_id string
----@param event_state schedule.event.state
-function M._cancel_event(event_id, event_state)
-	event_state.status = "cancelled"
-	state.set_event_state(event_id, event_state)
+	lifecycle.on_end(event_id, event_data)
+	lifecycle.on_disabled(event_id, event_data)
 end
 
 
@@ -695,7 +667,10 @@ function M._apply_catchup_cycle(event_id, event_state, cycle_start, cycle_end, c
 	state.set_event_state(event_id, event_state)
 
 	local event_data = M._create_event_data(event_id, event_state)
-	M._trigger_event_cycle(event_id, event_data)
+	lifecycle.on_start(event_id, event_data)
+	lifecycle.on_enabled(event_id, event_data)
+	lifecycle.on_end(event_id, event_data)
+	lifecycle.on_disabled(event_id, event_data)
 end
 
 
