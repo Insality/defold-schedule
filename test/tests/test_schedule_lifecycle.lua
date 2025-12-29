@@ -232,19 +232,19 @@ return function()
 		end)
 
 
-		it("Should push paused event to queue", function()
+		it("Should push disabled event to queue when paused", function()
 			local events = {}
 			schedule.on_event:subscribe(function(event)
 				table.insert(events, event)
 			end)
 
-			local pause_called = false
+			local disabled_called = false
 			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(120)
-				:on_pause(function(event_data)
-					pause_called = true
+				:on_disabled(function(event_data)
+					disabled_called = true
 				end)
 				:save()
 
@@ -254,33 +254,33 @@ return function()
 
 			event:pause()
 			assert(event:get_status() == "paused", "Event should be paused")
-			assert(pause_called, "on_pause callback should be called")
+			assert(disabled_called, "on_disabled callback should be called when paused")
 
-			local has_paused_event = false
+			local has_disabled_event = false
 			for _, e in ipairs(events) do
-				if e.callback_type == "paused" then
-					has_paused_event = true
-					assert(e.id == event:get_id(), "Paused event should have correct ID")
+				if e.callback_type == "disabled" then
+					has_disabled_event = true
+					assert(e.id == event:get_id(), "Disabled event should have correct ID")
 					break
 				end
 			end
-			assert(has_paused_event, "Should have paused event in queue")
+			assert(has_disabled_event, "Should have disabled event in queue")
 		end)
 
 
-		it("Should push resume event to queue", function()
+		it("Should push enabled event to queue when resumed", function()
 			local events = {}
 			schedule.on_event:subscribe(function(event)
 				table.insert(events, event)
 			end)
 
-			local resume_called = false
+			local enabled_called = false
 			local event = schedule.event()
 				:category("liveops")
 				:after(60)
 				:duration(120)
-				:on_resume(function(event_data)
-					resume_called = true
+				:on_enabled(function(event_data)
+					enabled_called = true
 				end)
 				:save()
 
@@ -290,17 +290,17 @@ return function()
 
 			event:resume()
 			assert(event:get_status() == "active", "Event should be active")
-			assert(resume_called, "on_resume callback should be called")
+			assert(enabled_called, "on_enabled callback should be called when resumed")
 
-			local has_resume_event = false
+			local has_enabled_event = false
 			for _, e in ipairs(events) do
-				if e.callback_type == "resume" then
-					has_resume_event = true
-					assert(e.id == event:get_id(), "Resume event should have correct ID")
+				if e.callback_type == "enabled" then
+					has_enabled_event = true
+					assert(e.id == event:get_id(), "Enabled event should have correct ID")
 					break
 				end
 			end
-			assert(has_resume_event, "Should have resume event in queue")
+			assert(has_enabled_event, "Should have enabled event in queue")
 		end)
 
 

@@ -200,24 +200,6 @@ function M:on_end(callback)
 end
 
 
----Set callback called when the event is paused. Use for pausing timers, animations, or other active state.
----@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
----@return schedule.event_builder Self for method chaining
-function M:on_pause(callback)
-	self.config.on_pause = callback
-	return self
-end
-
-
----Set callback called when the event is resumed from paused state. Use for resuming timers, animations, or other active state.
----@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
----@return schedule.event_builder Self for method chaining
-function M:on_resume(callback)
-	self.config.on_resume = callback
-	return self
-end
-
-
 ---Set callback called when the event fails (aborted due to condition failure). Use for handling failure cases.
 ---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
 ---@return schedule.event_builder Self for method chaining
@@ -374,8 +356,6 @@ function M:save()
 	lifecycle.register_callback(event_id, "on_enabled", self.config.on_enabled)
 	lifecycle.register_callback(event_id, "on_disabled", self.config.on_disabled)
 	lifecycle.register_callback(event_id, "on_end", self.config.on_end)
-	lifecycle.register_callback(event_id, "on_pause", self.config.on_pause)
-	lifecycle.register_callback(event_id, "on_resume", self.config.on_resume)
 	lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
 
 	self.event_id = event_id

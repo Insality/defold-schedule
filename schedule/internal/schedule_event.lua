@@ -286,7 +286,7 @@ function M:pause()
 		start_time = event_state.start_time,
 		end_time = event_state.end_time
 	}
-	lifecycle.on_pause(event_id, event_data)
+	lifecycle.on_disabled(event_id, event_data)
 
 	return true
 end
@@ -338,7 +338,6 @@ function M:resume()
 		start_time = event_state.start_time,
 		end_time = event_state.end_time
 	}
-	lifecycle.on_resume(event_id, event_data)
 	lifecycle.on_enabled(event_id, event_data)
 
 	return true

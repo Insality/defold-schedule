@@ -3,7 +3,7 @@
 local logger = require("schedule.internal.schedule_logger")
 local queue = require("event.queue")
 
----@alias schedule.lifecycle.event "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
+---@alias schedule.lifecycle.event "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_fail"
 
 local M = {}
 
@@ -26,9 +26,7 @@ function M.register_callback(event_id, callback_type, callback)
 		return
 	end
 
-	if not callbacks[event_id] then
-		callbacks[event_id] = {}
-	end
+	callbacks[event_id] = callbacks[event_id] or {}
 	callbacks[event_id][callback_type] = callback
 end
 
@@ -38,10 +36,7 @@ end
 ---@param callback_type schedule.lifecycle.event
 ---@return function|string|nil
 function M.get_callback(event_id, callback_type)
-	if not callbacks[event_id] then
-		return nil
-	end
-	return callbacks[event_id][callback_type]
+	return callbacks[event_id] and callbacks[event_id][callback_type]
 end
 
 
@@ -65,14 +60,12 @@ local CALLBACK_TO_EVENT = {
 	on_enabled = "enabled",
 	on_disabled = "disabled",
 	on_end = "end",
-	on_pause = "paused",
-	on_resume = "resume",
 	on_fail = "fail"
 }
 
 
 ---Push event to queue
----@param event_type string Event type ("start", "end", "enabled", "disabled", "paused", "resume", "fail", "active")
+---@param event_type string Event type ("start", "end", "enabled", "disabled", "fail", "active")
 ---@param event_data table Event data to push
 function M.push_event(event_type, event_data)
 	M.event_queue:push({
@@ -126,9 +119,6 @@ end
 ---@param event_data table
 function M.on_enabled(event_id, event_data)
 	M.trigger_callback(event_id, "on_enabled", event_data)
-	if event_data.status == "active" then
-		M.push_event("active", event_data)
-	end
 end
 
 
@@ -145,22 +135,6 @@ end
 ---@param event_data table
 function M.on_end(event_id, event_data)
 	M.trigger_callback(event_id, "on_end", event_data)
-end
-
-
----Trigger on_pause callback
----@param event_id string
----@param event_data table
-function M.on_pause(event_id, event_data)
-	M.trigger_callback(event_id, "on_pause", event_data)
-end
-
-
----Trigger on_resume callback
----@param event_id string
----@param event_data table
-function M.on_resume(event_id, event_data)
-	M.trigger_callback(event_id, "on_resume", event_data)
 end
 
 
