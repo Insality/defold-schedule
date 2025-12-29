@@ -92,7 +92,7 @@ end
 ---@param callback_type schedule.lifecycle.event
 ---@param event_data table Event data to pass
 function M.trigger_callback(event_id, callback_type, event_data)
-	logger:info("Lifecycle: " .. callback_type, { event_id = event_id, category = event_data.category })
+	logger:info("Schedule event: " .. callback_type, { event_id = event_id, category = event_data.category })
 
 	local callback = M.get_callback(event_id, callback_type)
 	if callback then

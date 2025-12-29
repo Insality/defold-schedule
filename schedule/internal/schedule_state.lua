@@ -55,11 +55,9 @@ local state = {
 
 ---Reset state to default
 function M.reset()
-	state = {
-		events = {},
-		last_update_time = nil,
-		events_created = 0,
-	}
+	state.events = {}
+	state.last_update_time = nil
+	state.events_created = 0
 end
 
 

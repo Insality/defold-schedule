@@ -12,7 +12,7 @@ function init(self)
 	schedule.set_logger(log.get_logger("schedule"))
 
 	saver.init()
-	--saver.bind_save_state("schedule", schedule.get_state())
+	saver.bind_save_state("schedule", schedule.get_state())
 
 	self.druid:new_widget(fps_panel, "fps_panel")
 	self.druid:new_widget(memory_panel, "memory_panel")
@@ -128,11 +128,16 @@ function init(self)
 		cancelled_event:cancel()
 	end
 
-	--schedule.event("some")
-	--	:duration(100)
-	--	:save()
+	--schedule.event():duration(100):save()
+	--schedule.event():duration(100):save()
+	--schedule.event():duration(100):save()
 
-	saver.save_game_state()
+	schedule.on_event:subscribe(function(event)
+		print("Event: " .. event.id, event.category, event.payload)
+		pprint(event)
+	end)
+
+	pprint("Active", schedule.filter(nil, "active"))
 
 	self.properties_panel = self.druid:new_widget(properties_panel, "properties_panel")
 	self.properties_panel:add_button(function(button)
