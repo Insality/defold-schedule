@@ -153,31 +153,31 @@ function M:finish()
 		return false
 	end
 
-	local event_status = state.get_event_state(event_id)
-	if not event_status then
+	local event_state = state.get_event_state(event_id)
+	if not event_state then
 		return false
 	end
 	local current_time = time.get_time()
-	local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
+	local event_data = { id = event_id, category = event_state.category, payload = event_state.payload }
 
-	if event_status.status == "pending" or event_status.status == "cancelled" or event_status.status == "aborted" or event_status.status == "failed" or event_status.status == "paused" then
-		if not event_status.start_time then
-			event_status.start_time = current_time
+	if event_state.status == "pending" or event_state.status == "cancelled" or event_state.status == "aborted" or event_state.status == "failed" or event_state.status == "paused" then
+		if not event_state.start_time then
+			event_state.start_time = current_time
 		end
 		lifecycle.on_start(event_id, event_data)
 		lifecycle.on_enabled(event_id, event_data)
 	end
 
-	event_status.status = "completed"
-	event_status.last_update_time = current_time
-	if not event_status.start_time then
-		event_status.start_time = current_time
+	event_state.status = "completed"
+	event_state.last_update_time = current_time
+	if not event_state.start_time then
+		event_state.start_time = current_time
 	end
-	if not event_status.end_time then
-		event_status.end_time = current_time
+	if not event_state.end_time then
+		event_state.end_time = current_time
 	end
-	state.set_event_state(event_id, event_status)
-	self.state = event_status
+	state.set_event_state(event_id, event_state)
+	self.state = event_state
 
 	lifecycle.on_end(event_id, event_data)
 	lifecycle.on_disabled(event_id, event_data)
@@ -195,32 +195,32 @@ function M:start()
 		return false
 	end
 
-	local event_status = state.get_event_state(event_id)
-	if not event_status then
+	local event_state = state.get_event_state(event_id)
+	if not event_state then
 		return false
 	end
 
-	if event_status.status == "active" or event_status.status == "completed" then
+	if event_state.status == "active" or event_state.status == "completed" then
 		return false
 	end
 
 	local current_time = time.get_time()
-	if not event_status.start_time then
-		event_status.start_time = current_time
+	if not event_state.start_time then
+		event_state.start_time = current_time
 	end
 
-	event_status.status = "active"
-	event_status.last_update_time = current_time
-	if event_status.infinity then
-		event_status.end_time = nil
+	event_state.status = "active"
+	event_state.last_update_time = current_time
+	if event_state.infinity then
+		event_state.end_time = nil
 	else
-		local end_time = processor.calculate_end_time(event_status, event_status.start_time)
-		event_status.end_time = end_time
+		local end_time = processor.calculate_end_time(event_state, event_state.start_time)
+		event_state.end_time = end_time
 	end
-	state.set_event_state(event_id, event_status)
-	self.state = event_status
+	state.set_event_state(event_id, event_state)
+	self.state = event_state
 
-	local event_data = { id = event_id, category = event_status.category, payload = event_status.payload }
+	local event_data = { id = event_id, category = event_state.category, payload = event_state.payload }
 	lifecycle.on_start(event_id, event_data)
 	lifecycle.on_enabled(event_id, event_data)
 
@@ -237,19 +237,19 @@ function M:cancel()
 		return false
 	end
 
-	local event_status = state.get_event_state(event_id)
-	if not event_status then
+	local event_state = state.get_event_state(event_id)
+	if not event_state then
 		return false
 	end
 
-	if event_status.status == "completed" then
+	if event_state.status == "completed" then
 		return false
 	end
 
-	event_status.status = "cancelled"
-	event_status.last_update_time = time.get_time()
-	state.set_event_state(event_id, event_status)
-	self.state = event_status
+	event_state.status = "cancelled"
+	event_state.last_update_time = time.get_time()
+	state.set_event_state(event_id, event_state)
+	self.state = event_state
 
 	return true
 end
@@ -264,27 +264,27 @@ function M:pause()
 		return false
 	end
 
-	local event_status = state.get_event_state(event_id)
-	if not event_status then
+	local event_state = state.get_event_state(event_id)
+	if not event_state then
 		return false
 	end
 
-	if event_status.status ~= "active" then
+	if event_state.status ~= "active" then
 		return false
 	end
 
-	event_status.status = "paused"
-	event_status.last_update_time = time.get_time()
-	state.set_event_state(event_id, event_status)
-	self.state = event_status
+	event_state.status = "paused"
+	event_state.last_update_time = time.get_time()
+	state.set_event_state(event_id, event_state)
+	self.state = event_state
 
 	local event_data = {
 		id = event_id,
-		category = event_status.category,
-		payload = event_status.payload,
+		category = event_state.category,
+		payload = event_state.payload,
 		status = "paused",
-		start_time = event_status.start_time,
-		end_time = event_status.end_time
+		start_time = event_state.start_time,
+		end_time = event_state.end_time
 	}
 	lifecycle.on_pause(event_id, event_data)
 
@@ -301,27 +301,27 @@ function M:resume()
 		return false
 	end
 
-	local event_status = state.get_event_state(event_id)
-	if not event_status then
+	local event_state = state.get_event_state(event_id)
+	if not event_state then
 		return false
 	end
 
-	if event_status.status ~= "paused" then
+	if event_state.status ~= "paused" then
 		return false
 	end
 
-	event_status.status = "active"
-	event_status.last_update_time = time.get_time()
-	state.set_event_state(event_id, event_status)
-	self.state = event_status
+	event_state.status = "active"
+	event_state.last_update_time = time.get_time()
+	state.set_event_state(event_id, event_state)
+	self.state = event_state
 
 	local event_data = {
 		id = event_id,
-		category = event_status.category,
-		payload = event_status.payload,
+		category = event_state.category,
+		payload = event_state.payload,
 		status = "active",
-		start_time = event_status.start_time,
-		end_time = event_status.end_time
+		start_time = event_state.start_time,
+		end_time = event_state.end_time
 	}
 	lifecycle.on_resume(event_id, event_data)
 	lifecycle.on_enabled(event_id, event_data)

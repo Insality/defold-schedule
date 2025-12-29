@@ -4,8 +4,6 @@ local logger = require("schedule.internal.schedule_logger")
 local event = require("schedule.internal.schedule_event")
 local time = require("schedule.internal.schedule_time")
 
-local event_id_counter = 0
-
 ---@class schedule.event_builder : schedule.event
 ---@field config table
 local M = {}
@@ -238,7 +236,6 @@ end
 
 
 
-
 ---Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 ---Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
 ---and callbacks are registered. If an existing event with the same ID exists, its state is merged.
@@ -248,22 +245,21 @@ function M:save()
 	local current_time = time.get_time()
 
 	local event_id = nil
-	local existing_status = nil
+	local existing_state = nil
 
 	if self.config.id then
 		event_id = self.config.id
-		existing_status = state.get_event_state(event_id)
+		existing_state = state.get_event_state(event_id)
 	else
-		event_id_counter = event_id_counter + 1
-		event_id = "schedule_" .. event_id_counter
+		event_id = state.get_next_event_id()
 	end
 
 	assert(event_id ~= nil, "Event ID must be generated")
 
-	if existing_status then
-		local calculated_start_time = existing_status.start_time
-		local calculated_end_time = existing_status.end_time
-		local initial_status = existing_status.status or "pending"
+	if existing_state then
+		local calculated_start_time = existing_state.start_time
+		local calculated_end_time = existing_state.end_time
+		local initial_status = existing_state.status or "pending"
 
 		if self.config.start_at then
 			local start_at = self.config.start_at
@@ -295,22 +291,22 @@ function M:save()
 			status = initial_status,
 			start_time = calculated_start_time,
 			end_time = calculated_end_time,
-			last_update_time = existing_status.last_update_time,
-			cycle_count = existing_status.cycle_count or 0,
-			next_cycle_time = existing_status.next_cycle_time,
-			category = self.config.category or existing_status.category,
-			payload = self.config.payload or existing_status.payload,
-			after = self.config.after or existing_status.after,
-			after_options = self.config.after_options or existing_status.after_options,
-			start_at = self.config.start_at or existing_status.start_at,
-			end_at = self.config.end_at or existing_status.end_at,
-			duration = self.config.duration or existing_status.duration,
-			infinity = self.config.infinity ~= nil and self.config.infinity or existing_status.infinity,
-			cycle = self.config.cycle or existing_status.cycle,
-			conditions = self.config.conditions or existing_status.conditions,
-			abort_on_fail = self.config.abort_on_fail ~= nil and self.config.abort_on_fail or existing_status.abort_on_fail,
-			catch_up = self.config.catch_up ~= nil and self.config.catch_up or existing_status.catch_up,
-			min_time = self.config.min_time or existing_status.min_time
+			last_update_time = existing_state.last_update_time,
+			cycle_count = existing_state.cycle_count or 0,
+			next_cycle_time = existing_state.next_cycle_time,
+			category = self.config.category or existing_state.category,
+			payload = self.config.payload or existing_state.payload,
+			after = self.config.after or existing_state.after,
+			after_options = self.config.after_options or existing_state.after_options,
+			start_at = self.config.start_at or existing_state.start_at,
+			end_at = self.config.end_at or existing_state.end_at,
+			duration = self.config.duration or existing_state.duration,
+			infinity = self.config.infinity ~= nil and self.config.infinity or existing_state.infinity,
+			cycle = self.config.cycle or existing_state.cycle,
+			conditions = self.config.conditions or existing_state.conditions,
+			abort_on_fail = self.config.abort_on_fail ~= nil and self.config.abort_on_fail or existing_state.abort_on_fail,
+			catch_up = self.config.catch_up ~= nil and self.config.catch_up or existing_state.catch_up,
+			min_time = self.config.min_time or existing_state.min_time
 		})
 	else
 		local calculated_start_time = nil
@@ -374,27 +370,13 @@ function M:save()
 		})
 	end
 
-	if self.config.on_start then
-		lifecycle.register_callback(event_id, "on_start", self.config.on_start)
-	end
-	if self.config.on_enabled then
-		lifecycle.register_callback(event_id, "on_enabled", self.config.on_enabled)
-	end
-	if self.config.on_disabled then
-		lifecycle.register_callback(event_id, "on_disabled", self.config.on_disabled)
-	end
-	if self.config.on_end then
-		lifecycle.register_callback(event_id, "on_end", self.config.on_end)
-	end
-	if self.config.on_pause then
-		lifecycle.register_callback(event_id, "on_pause", self.config.on_pause)
-	end
-	if self.config.on_resume then
-		lifecycle.register_callback(event_id, "on_resume", self.config.on_resume)
-	end
-	if self.config.on_fail then
-		lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
-	end
+	lifecycle.register_callback(event_id, "on_start", self.config.on_start)
+	lifecycle.register_callback(event_id, "on_enabled", self.config.on_enabled)
+	lifecycle.register_callback(event_id, "on_disabled", self.config.on_disabled)
+	lifecycle.register_callback(event_id, "on_end", self.config.on_end)
+	lifecycle.register_callback(event_id, "on_pause", self.config.on_pause)
+	lifecycle.register_callback(event_id, "on_resume", self.config.on_resume)
+	lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
 
 	self.event_id = event_id
 

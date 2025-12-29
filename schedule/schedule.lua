@@ -97,11 +97,11 @@ end
 ---@param event_id string The event ID returned from `event():save()` or set via `event():id()`
 ---@return schedule.event|nil event Event object with query methods, or nil if event doesn't exist
 function M.get(event_id)
-	local event_status = state.get_event_state(event_id)
-	if not event_status then
+	local event_state = state.get_event_state(event_id)
+	if not event_state then
 		return nil
 	end
-	return event_class.create(event_status)
+	return event_class.create(event_state)
 end
 
 
@@ -164,21 +164,21 @@ function M.filter(category, status)
 	local result = {}
 	local all_events = state.get_all_events()
 
-	for event_id, event_status in pairs(all_events) do
+	for event_id, event_state in pairs(all_events) do
 		local matches_category = true
 		local matches_status = true
 
 		if category ~= nil then
-			matches_category = (event_status.category == category)
+			matches_category = (event_state.category == category)
 		end
 
 		if status ~= nil then
-			local event_status_str = event_status.status or "pending"
+			local event_status_str = event_state.status or "pending"
 			matches_status = (event_status_str == status)
 		end
 
 		if matches_category and matches_status then
-			local event = event_class.create(event_status)
+			local event = event_class.create(event_state)
 			if event then
 				result[event_id] = event
 			end

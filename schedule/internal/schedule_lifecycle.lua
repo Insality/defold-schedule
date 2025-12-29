@@ -3,6 +3,7 @@
 local logger = require("schedule.internal.schedule_logger")
 local queue = require("event.queue")
 
+---@alias schedule.lifecycle.event "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
 
 local M = {}
 
@@ -18,9 +19,13 @@ M.event_queue = queue.create()
 
 ---Register callback for event
 ---@param event_id string
----@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
+---@param callback_type schedule.lifecycle.event
 ---@param callback function|string|nil
 function M.register_callback(event_id, callback_type, callback)
+	if not callback then
+		return
+	end
+
 	if not callbacks[event_id] then
 		callbacks[event_id] = {}
 	end
@@ -30,7 +35,7 @@ end
 
 ---Get callback for event
 ---@param event_id string
----@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
+---@param callback_type schedule.lifecycle.event
 ---@return function|string|nil
 function M.get_callback(event_id, callback_type)
 	if not callbacks[event_id] then
@@ -84,7 +89,7 @@ end
 
 ---Call lifecycle callback safely and push event to queue
 ---@param event_id string
----@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
+---@param callback_type schedule.lifecycle.event
 ---@param event_data table Event data to pass
 function M.trigger_callback(event_id, callback_type, event_data)
 	logger:info("Lifecycle: " .. callback_type, { event_id = event_id, category = event_data.category })

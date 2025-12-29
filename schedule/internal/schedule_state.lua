@@ -39,6 +39,7 @@
 ---@class schedule.state
 ---@field events table<string, schedule.event.state> Event ID -> state
 ---@field last_update_time number|nil Last time update was called
+---@field events_created number|nil
 
 local M = {}
 
@@ -47,7 +48,8 @@ local M = {}
 ---@type schedule.state
 local state = {
 	events = {},
-	last_update_time = nil
+	last_update_time = nil,
+	events_created = 0,
 }
 
 
@@ -55,7 +57,8 @@ local state = {
 function M.reset()
 	state = {
 		events = {},
-		last_update_time = nil
+		last_update_time = nil,
+		events_created = 0,
 	}
 end
 
@@ -70,7 +73,7 @@ end
 ---Set the entire state (for deserialization)
 ---@param new_state schedule.state
 function M.set_state(new_state)
-	state = new_state or { events = {}, last_update_time = nil }
+	state = new_state or { events = {}, last_update_time = nil, events_created = 0 }
 	if not state.events then
 		state.events = {}
 	end
@@ -112,6 +115,14 @@ end
 ---@param time number
 function M.set_last_update_time(time)
 	state.last_update_time = time
+end
+
+
+---Return the next generated event ID
+---@return string event_id
+function M.get_next_event_id()
+	state.events_created = state.events_created + 1
+	return "schedule_" .. state.events_created
 end
 
 
