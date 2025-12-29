@@ -7,7 +7,7 @@
 local schedule = require("schedule.schedule")
 
 --- 1 hour craft
-local craft_id = schedule.event()
+local craft = schedule.event()
 	:category("craft")
 	:duration(60 * 60)
 	:payload( { building_id = "crafting_table", item_id = "iron_shovel", quantity = 1 } )
@@ -28,7 +28,7 @@ local craft_1 = schedule.event()
 
 local craft_2 = schedule.event()
 	:category("craft")
-	:after(craft_1, { wait_online = true })
+	:after(craft_1:get_id(), { wait_online = true })
 	:duration(schedule.HOUR)
 	:payload( { building_id = "crafting_table", item_id = "iron_shovel", quantity = 1 } )
 	:save()
@@ -47,7 +47,7 @@ schedule.event()
 	:save()
 
 schedule.on_event:subscribe(function(event)
-	if event.category ~= "craft" then
+	if event.category ~= "craft" or event.callback_type ~= "active" then
 		return false
 	end
 
@@ -220,8 +220,10 @@ schedule.event("event_new_year")
 ```lua
 local schedule = require("schedule.schedule")
 
-local event_id = schedule.event("event_first_week")
+local event = schedule.event("event_first_week")
 	:category("liveops")
 	:duration(7 * schedule.DAY)
 	:save()
+
+local event_id = event:get_id()
 ```
