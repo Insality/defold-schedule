@@ -20,7 +20,7 @@ M.event_queue = queue.create()
 ---Register callback for event
 ---@param event_id string
 ---@param callback_type schedule.lifecycle.event
----@param callback function|string|nil
+---@param callback function?
 function M.register_callback(event_id, callback_type, callback)
 	if not callback then
 		return
@@ -95,7 +95,7 @@ function M.trigger_callback(event_id, callback_type, event_data)
 	logger:info("Lifecycle: " .. callback_type, { event_id = event_id, category = event_data.category })
 
 	local callback = M.get_callback(event_id, callback_type)
-	if callback and type(callback) == "function" then
+	if callback then
 		local success, err = pcall(callback, event_data)
 		if not success then
 			logger:error("Lifecycle callback failed", {
@@ -109,26 +109,6 @@ function M.trigger_callback(event_id, callback_type, event_data)
 	local event_type = CALLBACK_TO_EVENT[callback_type]
 	if event_type then
 		M.push_event(event_type, event_data)
-	end
-end
-
-
----Call lifecycle callback safely
----@param callback function|nil
----@param event_data table Event data to pass
----@param callback_name string Name for logging
-function M.call_callback(callback, event_data, callback_name)
-	if not callback then
-		return
-	end
-
-	local success, err = pcall(callback, event_data)
-	if not success then
-		logger:error("Lifecycle callback failed", {
-			callback = callback_name,
-			error = tostring(err),
-			event_id = event_data.id
-		})
 	end
 end
 

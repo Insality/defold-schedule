@@ -128,29 +128,6 @@ end
 ---Processes all events, handles time progression, and triggers lifecycle callbacks. Initializes time tracking on first call.
 function M.update()
 	local current_time = time.get_time()
-	local was_first_update = not state.get_last_update_time()
-	if was_first_update then
-		state.set_last_update_time(current_time)
-	end
-
-	-- TODO seems better to remove this? just callbacks in event
-	if was_first_update then
-		local all_events = state.get_all_events()
-		for event_id, event_state in pairs(all_events) do
-			if event_state.status == "active" then
-				local event_data = {
-					id = event_id,
-					category = event_state.category,
-					payload = event_state.payload,
-					status = "active",
-					start_time = event_state.start_time,
-					end_time = event_state.end_time
-				}
-				lifecycle.on_enabled(event_id, event_data)
-			end
-		end
-	end
-
 	processor.update_all(current_time)
 end
 
