@@ -253,6 +253,90 @@ return function()
 		end)
 
 
+		it("Should extend duration when paused event with duration is resumed", function()
+			local event = schedule.event()
+				:duration(100)
+				:save()
+
+			schedule.update()
+			assert(event:get_status() == "active", "Event should be active")
+			
+			local original_end_time = event:get_start_time() + 100
+			assert(event:get_time_left() == 100, "Event should have 100 seconds left")
+
+			time = 10
+			schedule.update()
+			assert(event:get_time_left() == 90, "Event should have 90 seconds left after 10 seconds")
+
+			event:pause()
+			assert(event:get_status() == "paused", "Event should be paused")
+			
+			-- Wait 20 seconds while paused
+			time = 30
+			schedule.update()
+			assert(event:get_status() == "paused", "Event should remain paused")
+
+			-- Resume the event
+			event:resume()
+			assert(event:get_status() == "active", "Event should be active")
+			
+			-- Duration should be extended by 20 seconds (pause duration)
+			-- Original: 100 seconds, elapsed: 10 seconds, paused: 20 seconds
+			-- New end_time should be: start_time + 100 + 20 = start_time + 120
+			-- Time left should be: 90 seconds (original remaining) + 20 seconds (pause extension) = 110 seconds
+			-- But actually, since we're at time 30, and end_time is now start_time + 120, time left = 120 - 30 = 90
+			-- Wait, let me recalculate:
+			-- start_time = 0
+			-- original end_time = 0 + 100 = 100
+			-- at time 10: time_left = 100 - 10 = 90
+			-- pause at time 10
+			-- resume at time 30 (20 seconds later)
+			-- new end_time = 100 + 20 = 120
+			-- at time 30: time_left = 120 - 30 = 90
+			-- So time left should still be 90, but the total duration is now 120
+			local time_left = event:get_time_left()
+			assert(time_left == 90, "Event should have 90 seconds left (original 90 + pause extension compensated)")
+			
+			-- Verify the end_time was extended
+			local event_state = schedule.get_status(event:get_id())
+			assert(event_state.end_time == 120, "End time should be extended to 120 (original 100 + pause 20)")
+		end)
+
+
+		it("Should not extend duration for events with hardcoded end_at", function()
+			local event = schedule.event()
+				:duration(100)
+				:end_at(200)  -- Hardcoded end time
+				:save()
+
+			schedule.update()
+			assert(event:get_status() == "active", "Event should be active")
+
+			time = 10
+			schedule.update()
+			local time_left_before = event:get_time_left()
+
+			event:pause()
+			assert(event:get_status() == "paused", "Event should be paused")
+			
+			-- Wait 20 seconds while paused
+			time = 30
+			schedule.update()
+
+			-- Resume the event
+			event:resume()
+			assert(event:get_status() == "active", "Event should be active")
+			
+			-- End time should NOT be extended for hardcoded end_at
+			local event_state = schedule.get_status(event:get_id())
+			assert(event_state.end_time == 200, "End time should remain 200 (hardcoded, not extended)")
+			
+			-- Time left should be reduced by the pause duration
+			local time_left_after = event:get_time_left()
+			assert(time_left_after < time_left_before, "Time left should be reduced (hardcoded end_at doesn't extend)")
+		end)
+
+
 		it("Should handle control methods on infinity events", function()
 			local event = schedule.event()
 				:infinity()

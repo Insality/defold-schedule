@@ -128,9 +128,9 @@ function init(self)
 		cancelled_event:cancel()
 	end
 
-	--schedule.event():duration(100):save()
-	--schedule.event():duration(100):save()
-	--schedule.event():duration(100):save()
+	schedule.event():duration(60):save()
+	schedule.event():duration(60):save()
+	schedule.event():duration(60):save()
 
 	schedule.on_event:subscribe(function(event)
 		print("Event: " .. event.id, event.category, event.payload)

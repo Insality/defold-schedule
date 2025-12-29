@@ -294,6 +294,7 @@ end
 
 ---Resume this paused event. Sets status back to "active".
 ---Only works on paused events.
+---For events with duration (not end_at), extends end_time by the pause duration.
 ---@return boolean success True if event was resumed
 function M:resume()
 	local event_id = self.state.event_id
@@ -310,8 +311,22 @@ function M:resume()
 		return false
 	end
 
+	local current_time = time.get_time()
+	local pause_start_time = event_state.last_update_time
+
+	-- Calculate pause duration
+	local pause_duration = 0
+	if pause_start_time then
+		pause_duration = current_time - pause_start_time
+	end
+
+	-- Extend end_time by pause duration for events with relative duration, not end_at
+	if pause_duration > 0 and event_state.duration and not event_state.end_at and event_state.end_time and not event_state.infinity then
+		event_state.end_time = event_state.end_time + pause_duration
+	end
+
 	event_state.status = "active"
-	event_state.last_update_time = time.get_time()
+	event_state.last_update_time = current_time
 	state.set_event_state(event_id, event_state)
 	self.state = event_state
 
