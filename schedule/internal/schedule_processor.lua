@@ -128,9 +128,8 @@ end
 ---@param event_status schedule.event.state
 ---@param last_update_time number|nil
 ---@param current_time number
----@param event_queue table|nil Event queue for emitting events
 ---@return boolean was_caught_up True if catch-up was processed, false otherwise
-function M.process_catchup(event_id, event_status, last_update_time, current_time, event_queue)
+function M.process_catchup(event_id, event_status, last_update_time, current_time)
 	if not event_status.catch_up or not last_update_time then
 		return false
 	end
@@ -160,7 +159,7 @@ function M.process_catchup(event_id, event_status, last_update_time, current_tim
 
 				if #processed_cycles > 0 then
 					for i, cycle_data in ipairs(processed_cycles) do
-						M._apply_catchup_cycle(event_id, event_status, cycle_data.start, cycle_data.end_time, current_time, event_queue)
+						M._apply_catchup_cycle(event_id, event_status, cycle_data.start, cycle_data.end_time, current_time)
 					end
 
 					local last_cycle = processed_cycles[#processed_cycles]
@@ -196,9 +195,8 @@ end
 ---@param event_id string
 ---@param event_status schedule.event.state
 ---@param current_time number
----@param event_queue table|nil Event queue for emitting events
 ---@return boolean cycle_processed True if cycle was processed, false otherwise
-function M.process_cycle(event_id, event_status, current_time, event_queue)
+function M.process_cycle(event_id, event_status, current_time)
 	if not event_status.cycle then
 		return false
 	end
@@ -346,9 +344,8 @@ end
 ---@param event_id string
 ---@param current_time number
 ---@param last_update_time number|nil
----@param event_queue table|nil Event queue for emitting events
 ---@return boolean event_updated True if event was updated, false otherwise
-function M.update_event(event_id, current_time, last_update_time, event_queue)
+function M.update_event(event_id, current_time, last_update_time)
 	local event_status = state.get_event_state(event_id)
 
 	if not event_status then
@@ -357,7 +354,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 
 	if M._is_startable_status(event_status.status) or event_status.status == "paused" then
 		if event_status.catch_up and last_update_time then
-			M.process_catchup(event_id, event_status, last_update_time, current_time, event_queue)
+			M.process_catchup(event_id, event_status, last_update_time, current_time)
 		end
 
 		local start_time = event_status.start_time
@@ -401,13 +398,13 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 			local should_start = M.should_start_event(event_id, event_status, current_time, last_update_time)
 			if should_start then
 				local end_time = M.calculate_end_time(event_status, start_time)
-				M._activate_event(event_id, event_status, start_time, end_time, current_time, event_queue)
+				M._activate_event(event_id, event_status, start_time, end_time, current_time)
 
 				if not end_time and not event_status.infinity and event_status.after and not event_status.start_at then
 					M._complete_event(event_id, event_status, start_time, end_time, current_time)
 
 					if event_status.cycle then
-						M.process_cycle(event_id, event_status, current_time, event_queue)
+						M.process_cycle(event_id, event_status, current_time)
 					end
 
 					return true
@@ -431,15 +428,15 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 				M._complete_event(event_id, event_status, nil, end_time, current_time)
 
 				if event_status.cycle then
-					M.process_cycle(event_id, event_status, current_time, event_queue)
+					M.process_cycle(event_id, event_status, current_time)
 				end
 
 				return true
 			end
 		else
-			if M.process_catchup(event_id, event_status, last_update_time, current_time, event_queue) then
+			if M.process_catchup(event_id, event_status, last_update_time, current_time) then
 				if event_status.cycle then
-					local cycle_processed = M.process_cycle(event_id, event_status, current_time, event_queue)
+					local cycle_processed = M.process_cycle(event_id, event_status, current_time)
 					if cycle_processed then
 						return true
 					end
@@ -454,7 +451,7 @@ function M.update_event(event_id, current_time, last_update_time, event_queue)
 	end
 
 	if event_status.status == "completed" and event_status.cycle then
-		local cycle_processed = M.process_cycle(event_id, event_status, current_time, event_queue)
+		local cycle_processed = M.process_cycle(event_id, event_status, current_time)
 		if cycle_processed then
 			return true
 		end
@@ -468,14 +465,13 @@ end
 
 ---Update all events
 ---@param current_time number
----@param event_queue table|nil Event queue for emitting events
-function M.update_all(current_time, event_queue)
+function M.update_all(current_time)
 	local last_update_time = state.get_last_update_time()
 	local all_events = state.get_all_events()
 	local any_updated = false
 
 	for event_id, event_status in pairs(all_events) do
-		local updated = M.update_event(event_id, current_time, last_update_time, event_queue)
+		local updated = M.update_event(event_id, current_time, last_update_time)
 		if updated then
 			any_updated = true
 		end
@@ -495,7 +491,7 @@ function M.update_all(current_time, event_queue)
 						if not current_event_status.start_time or current_event_status.start_time < after_status.end_time then
 							current_event_status.start_time = after_status.end_time
 							state.set_event_state(event_id, current_event_status)
-							local updated = M.update_event(event_id, current_time, last_update_time, event_queue)
+							local updated = M.update_event(event_id, current_time, last_update_time)
 							if updated then
 								any_updated = true
 								continue_chain = true
@@ -571,8 +567,7 @@ end
 ---@param start_time number
 ---@param end_time number|nil
 ---@param current_time number
----@param event_queue table|nil
-function M._activate_event(event_id, event_status, start_time, end_time, current_time, event_queue)
+function M._activate_event(event_id, event_status, start_time, end_time, current_time)
 	event_status.status = "active"
 	event_status.start_time = start_time
 	event_status.end_time = end_time
@@ -709,8 +704,7 @@ end
 ---@param cycle_start number
 ---@param cycle_end number
 ---@param current_time number
----@param event_queue table|nil
-function M._apply_catchup_cycle(event_id, event_status, cycle_start, cycle_end, current_time, event_queue)
+function M._apply_catchup_cycle(event_id, event_status, cycle_start, cycle_end, current_time)
 	event_status.status = "active"
 	event_status.start_time = cycle_start
 	event_status.end_time = cycle_end

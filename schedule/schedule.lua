@@ -151,7 +151,7 @@ function M.update()
 		end
 	end
 
-	processor.update_all(current_time, M.on_event)
+	processor.update_all(current_time)
 end
 
 
