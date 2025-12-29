@@ -58,5 +58,46 @@ function M.calculate_after_time(after, current_time)
 end
 
 
+---Update chained events - processes events that chain after other events
+---Updates start_time for chained events when their parent events complete
+---@param all_events table<string, schedule.event.state> All events to check
+---@param current_time number Current time
+---@param last_update_time number|nil Last update time
+---@param is_startable_status fun(status: string): boolean Function to check if status allows starting
+---@param update_event fun(event_id: string, current_time: number, last_update_time: number|nil): boolean Function to update an event
+---@return boolean any_updated True if any events were updated
+function M.update_chained_events(all_events, current_time, last_update_time, is_startable_status, update_event)
+	local any_updated = false
+	local continue_chain = true
+
+	while continue_chain do
+		continue_chain = false
+		for event_id, event_state in pairs(all_events) do
+			if type(event_state.after) == "string" then
+				local after_event_id = event_state.after
+				assert(type(after_event_id) == "string", "after_event_id must be string")
+				local after_status = state.get_event_state(after_event_id)
+				if after_status and after_status.status == "completed" and after_status.end_time then
+					local current_event_state = state.get_event_state(event_id)
+					if current_event_state and (is_startable_status(current_event_state.status) or current_event_state.status == "paused") then
+						if not current_event_state.start_time or current_event_state.start_time < after_status.end_time then
+							current_event_state.start_time = after_status.end_time
+							state.set_event_state(event_id, current_event_state)
+							local updated = update_event(event_id, current_time, last_update_time)
+							if updated then
+								any_updated = true
+								continue_chain = true
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return any_updated
+end
+
+
 return M
 

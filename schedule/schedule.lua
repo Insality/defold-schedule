@@ -127,8 +127,7 @@ end
 ---Update the schedule system. Call this at your desired refresh rate (e.g., in your game loop or timer callback).
 ---Processes all events, handles time progression, and triggers lifecycle callbacks. Initializes time tracking on first call.
 function M.update()
-	local current_time = time.get_time()
-	processor.update_all(current_time)
+	processor.update_all(time.get_time())
 end
 
 

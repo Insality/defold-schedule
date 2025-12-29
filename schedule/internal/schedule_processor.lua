@@ -472,36 +472,18 @@ function M.update_all(current_time)
 
 	for event_id, event_state in pairs(all_events) do
 		local updated = M.update_event(event_id, current_time, last_update_time)
-		if updated then
-			any_updated = true
-		end
+		updated = updated or any_updated
 	end
 
-	local continue_chain = true
-	while continue_chain do
-		continue_chain = false
-		for event_id, event_state in pairs(all_events) do
-			if type(event_state.after) == "string" then
-				local after_event_id = event_state.after
-				assert(type(after_event_id) == "string", "after_event_id must be string")
-				local after_status = state.get_event_state(after_event_id)
-				if after_status and after_status.status == "completed" and after_status.end_time then
-					local current_event_state = state.get_event_state(event_id)
-					if current_event_state and (M._is_startable_status(current_event_state.status) or current_event_state.status == "paused") then
-						if not current_event_state.start_time or current_event_state.start_time < after_status.end_time then
-							current_event_state.start_time = after_status.end_time
-							state.set_event_state(event_id, current_event_state)
-							local updated = M.update_event(event_id, current_time, last_update_time)
-							if updated then
-								any_updated = true
-								continue_chain = true
-							end
-						end
-					end
-				end
-			end
-		end
-	end
+	-- Update chained events (events that start after other events complete)
+	local chained_updated = chaining.update_chained_events(
+		all_events,
+		current_time,
+		last_update_time,
+		M._is_startable_status,
+		M.update_event
+	)
+	any_updated = any_updated or chained_updated
 
 	state.set_last_update_time(current_time)
 	return any_updated

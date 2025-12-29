@@ -128,17 +128,6 @@ function init(self)
 		cancelled_event:cancel()
 	end
 
-	schedule.event():duration(60):save()
-	schedule.event():duration(60):save()
-	schedule.event():duration(60):save()
-
-	schedule.on_event:subscribe(function(event)
-		print("Event: " .. event.id, event.category, event.payload)
-		pprint(event)
-	end)
-
-	pprint("Active", schedule.filter(nil, "active"))
-
 	self.properties_panel = self.druid:new_widget(properties_panel, "properties_panel")
 	self.properties_panel:add_button(function(button)
 		button:set_text_property("Schedule Panel")
