@@ -123,8 +123,8 @@ If you have any issues, questions or suggestions please [create an issue](https:
 
 ## 👏 Contributors
 
-<a href="https://github.com/Insality/defold-event/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=insality/defold-event"/>
+<a href="https://github.com/Insality/defold-schedule/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=insality/defold-schedule"/>
 </a>
 
 

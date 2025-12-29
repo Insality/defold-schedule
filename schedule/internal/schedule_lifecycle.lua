@@ -54,6 +54,18 @@ function M.reset_callbacks()
 end
 
 
+---Mapping from callback type to event type
+local CALLBACK_TO_EVENT = {
+	on_start = "start",
+	on_enabled = "enabled",
+	on_disabled = "disabled",
+	on_end = "end",
+	on_pause = "paused",
+	on_resume = "resume",
+	on_fail = "fail"
+}
+
+
 ---Push event to queue
 ---@param event_type string Event type ("start", "end", "enabled", "disabled", "paused", "resume", "fail", "active")
 ---@param event_data table Event data to push
@@ -72,10 +84,9 @@ end
 
 ---Call lifecycle callback safely and push event to queue
 ---@param event_id string
----@param callback_type string Callback type ("on_start", "on_enabled", etc.)
----@param event_type string Event type to push ("start", "enabled", etc.)
+---@param callback_type "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_pause"|"on_resume"|"on_fail"
 ---@param event_data table Event data to pass
-function M.trigger_callback(event_id, callback_type, event_type, event_data)
+function M.trigger_callback(event_id, callback_type, event_data)
 	logger:info("Lifecycle: " .. callback_type, { event_id = event_id, category = event_data.category })
 
 	local callback = M.get_callback(event_id, callback_type)
@@ -90,7 +101,10 @@ function M.trigger_callback(event_id, callback_type, event_type, event_data)
 		end
 	end
 
-	M.push_event(event_type, event_data)
+	local event_type = CALLBACK_TO_EVENT[callback_type]
+	if event_type then
+		M.push_event(event_type, event_data)
+	end
 end
 
 
@@ -118,7 +132,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_start(event_id, event_data)
-	M.trigger_callback(event_id, "on_start", "start", event_data)
+	M.trigger_callback(event_id, "on_start", event_data)
 end
 
 
@@ -126,7 +140,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_enabled(event_id, event_data)
-	M.trigger_callback(event_id, "on_enabled", "enabled", event_data)
+	M.trigger_callback(event_id, "on_enabled", event_data)
 	if event_data.status == "active" then
 		M.push_event("active", event_data)
 	end
@@ -137,7 +151,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_disabled(event_id, event_data)
-	M.trigger_callback(event_id, "on_disabled", "disabled", event_data)
+	M.trigger_callback(event_id, "on_disabled", event_data)
 end
 
 
@@ -145,7 +159,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_end(event_id, event_data)
-	M.trigger_callback(event_id, "on_end", "end", event_data)
+	M.trigger_callback(event_id, "on_end", event_data)
 end
 
 
@@ -153,7 +167,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_pause(event_id, event_data)
-	M.trigger_callback(event_id, "on_pause", "paused", event_data)
+	M.trigger_callback(event_id, "on_pause", event_data)
 end
 
 
@@ -161,7 +175,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_resume(event_id, event_data)
-	M.trigger_callback(event_id, "on_resume", "resume", event_data)
+	M.trigger_callback(event_id, "on_resume", event_data)
 end
 
 
@@ -169,7 +183,7 @@ end
 ---@param event_id string
 ---@param event_data table
 function M.on_fail(event_id, event_data)
-	M.trigger_callback(event_id, "on_fail", "fail", event_data)
+	M.trigger_callback(event_id, "on_fail", event_data)
 end
 
 
