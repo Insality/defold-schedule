@@ -133,17 +133,18 @@ function M.update()
 		state.set_last_update_time(current_time)
 	end
 
+	-- TODO seems better to remove this? just callbacks in event
 	if was_first_update then
 		local all_events = state.get_all_events()
-		for event_id, event_status in pairs(all_events) do
-			if event_status.status == "active" then
+		for event_id, event_state in pairs(all_events) do
+			if event_state.status == "active" then
 				local event_data = {
 					id = event_id,
-					category = event_status.category,
-					payload = event_status.payload,
+					category = event_state.category,
+					payload = event_state.payload,
 					status = "active",
-					start_time = event_status.start_time,
-					end_time = event_status.end_time
+					start_time = event_state.start_time,
+					end_time = event_state.end_time
 				}
 				lifecycle.on_enabled(event_id, event_data)
 			end

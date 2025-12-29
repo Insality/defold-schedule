@@ -90,6 +90,39 @@ function M:get_time_to_start()
 end
 
 
+---Get event progress
+---@return number progress Progress value between 0 and 1
+function M:get_progress()
+	local status = self:get_status()
+	local current_time = time.get_time()
+
+	if status == "completed" then
+		return 1
+	end
+
+	if status == "pending" then
+		return 0
+	end
+
+	if status == "active" or status == "paused" then
+		if self.state.infinity or not self.state.end_time then
+			return 0
+		end
+		if not self.state.start_time then
+			return 0
+		end
+		local duration = self.state.end_time - self.state.start_time
+		if duration <= 0 then
+			return 1
+		end
+		local elapsed = current_time - self.state.start_time
+		return math.max(0, math.min(1, elapsed / duration))
+	end
+
+	return 0
+end
+
+
 ---Get event payload
 ---@return any payload Event payload data
 function M:get_payload()
