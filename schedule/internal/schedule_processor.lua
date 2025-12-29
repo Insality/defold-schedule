@@ -101,7 +101,6 @@ function M.should_start_event(event_id, event_state, current_time, last_update_t
 	if not all_conditions_passed then
 		if event_state.abort_on_fail then
 			event_state.status = "aborted"
-			state.set_event_state(event_id, event_state)
 			local event_data = M._create_event_data(event_id, event_state)
 			lifecycle.on_fail(event_id, event_data)
 		end
@@ -143,7 +142,6 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 					event_state.status = "active"
 					event_state.start_time = start_time
 					event_state.end_time = end_time
-					state.set_event_state(event_id, event_state)
 
 					local event_data = M._create_event_data(event_id, event_state)
 					lifecycle.on_start(event_id, event_data)
@@ -155,7 +153,6 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 					event_state.start_time = start_time
 					event_state.end_time = end_time
 					event_state.last_update_time = current_time
-					state.set_event_state(event_id, event_state)
 					return true
 				end
 			else
@@ -176,7 +173,6 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 						event_state.start_time = last_cycle.start
 						event_state.end_time = last_cycle.end_time
 						event_state.last_update_time = current_time
-						state.set_event_state(event_id, event_state)
 						return true
 					end
 				end
@@ -256,7 +252,6 @@ function M.process_cycle(event_id, event_state, current_time)
 							event_state.start_time = new_start_time
 							event_state.end_time = new_end_time
 							event_state.cycle_count = (event_state.cycle_count or 0) + 1
-							state.set_event_state(event_id, event_state)
 
 							M._update_chained_events(event_id)
 
@@ -272,7 +267,6 @@ function M.process_cycle(event_id, event_state, current_time)
 				end
 
 				event_state.next_cycle_time = (next_cycle_time and next_cycle_time > current_time) and next_cycle_time or nil
-				state.set_event_state(event_id, event_state)
 
 				return true
 			end
@@ -315,7 +309,6 @@ function M.process_cycle(event_id, event_state, current_time)
 						)
 						if skipped_cycle_time then
 							event_state.next_cycle_time = skipped_cycle_time
-							state.set_event_state(event_id, event_state)
 						end
 						return false
 					end
@@ -326,7 +319,6 @@ function M.process_cycle(event_id, event_state, current_time)
 				event_state.end_time = new_end_time
 				event_state.cycle_count = (event_state.cycle_count or 0) + 1
 				event_state.next_cycle_time = nil
-				state.set_event_state(event_id, event_state)
 
 				M._update_chained_events(event_id)
 
@@ -340,7 +332,6 @@ function M.process_cycle(event_id, event_state, current_time)
 
 		if next_cycle_time and next_cycle_time > current_time then
 			event_state.next_cycle_time = next_cycle_time
-			state.set_event_state(event_id, event_state)
 		end
 	end
 
@@ -370,7 +361,6 @@ function M.update_event(event_id, current_time, last_update_time)
 			start_time = M.calculate_start_time(event_state, current_time, last_update_time)
 			if start_time then
 				event_state.start_time = start_time
-				state.set_event_state(event_id, event_state)
 			end
 		end
 
@@ -382,7 +372,6 @@ function M.update_event(event_id, current_time, last_update_time)
 				if not start_time or start_time < after_status.end_time then
 					start_time = after_status.end_time
 					event_state.start_time = start_time
-					state.set_event_state(event_id, event_state)
 				end
 			end
 		end
@@ -423,7 +412,6 @@ function M.update_event(event_id, current_time, last_update_time)
 				local all_conditions_passed, failed_condition = conditions.evaluate_conditions(event_state)
 				if all_conditions_passed then
 					event_state.status = "pending"
-					state.set_event_state(event_id, event_state)
 				end
 			end
 		end
@@ -466,7 +454,6 @@ function M.update_event(event_id, current_time, last_update_time)
 	end
 
 	event_state.last_update_time = current_time
-	state.set_event_state(event_id, event_state)
 	return false
 end
 
@@ -512,7 +499,7 @@ end
 ---@return table event_data
 function M._create_event_data(event_id, event_state)
 	return {
-		id = event_id,
+		event_id = event_id,
 		category = event_state.category,
 		payload = event_state.payload,
 		status = event_state.status,
@@ -533,7 +520,6 @@ function M._activate_event(event_id, event_state, start_time, end_time, current_
 	event_state.start_time = start_time
 	event_state.end_time = end_time
 	event_state.last_update_time = current_time
-	state.set_event_state(event_id, event_state)
 
 	local event_data = M._create_event_data(event_id, event_state)
 	lifecycle.on_start(event_id, event_data)
@@ -556,7 +542,6 @@ function M._complete_event(event_id, event_state, start_time, end_time, current_
 		event_state.end_time = end_time
 	end
 	event_state.last_update_time = current_time
-	state.set_event_state(event_id, event_state)
 
 	local event_data = M._create_event_data(event_id, event_state)
 	lifecycle.on_end(event_id, event_data)
@@ -576,7 +561,6 @@ function M._update_chained_events(event_id, all_events)
 			if chained_event_state.status == "pending" or chained_event_state.status == "completed" then
 				chained_event_state.start_time = nil
 				chained_event_state.status = "pending"
-				state.set_event_state(chained_event_id, chained_event_state)
 			end
 		end
 	end
@@ -664,7 +648,6 @@ function M._apply_catchup_cycle(event_id, event_state, cycle_start, cycle_end, c
 	event_state.end_time = cycle_end
 	event_state.cycle_count = (event_state.cycle_count or 0) + 1
 	event_state.last_update_time = current_time
-	state.set_event_state(event_id, event_state)
 
 	local event_data = M._create_event_data(event_id, event_state)
 	lifecycle.on_start(event_id, event_data)

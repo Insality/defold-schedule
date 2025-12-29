@@ -82,7 +82,6 @@ function M.update_chained_events(all_events, current_time, last_update_time, is_
 					if current_event_state and (is_startable_status(current_event_state.status) or current_event_state.status == "paused") then
 						if not current_event_state.start_time or current_event_state.start_time < after_status.end_time then
 							current_event_state.start_time = after_status.end_time
-							state.set_event_state(event_id, current_event_state)
 							local updated = update_event(event_id, current_time, last_update_time)
 							if updated then
 								any_updated = true

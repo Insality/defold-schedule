@@ -110,7 +110,7 @@ return function()
 			schedule.on_event:subscribe(function(event)
 				if event.callback_type == "enabled" then
 					table.insert(emissions, {
-						id = event.id,
+						event_id = event.event_id,
 						start_time = event.start_time
 					})
 				end
@@ -132,7 +132,7 @@ return function()
 			time = 60
 			schedule.update()
 			assert(#emissions == 2, "Both events should emit")
-			assert(emissions[1].id ~= emissions[2].id, "Different events should have different IDs")
+			assert(emissions[1].event_id ~= emissions[2].event_id, "Different events should have different IDs")
 		end)
 
 

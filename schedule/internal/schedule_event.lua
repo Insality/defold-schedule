@@ -158,7 +158,7 @@ function M:finish()
 		return false
 	end
 	local current_time = time.get_time()
-	local event_data = { id = event_id, category = event_state.category, payload = event_state.payload }
+	local event_data = { event_id = event_id, category = event_state.category, payload = event_state.payload }
 
 	if event_state.status == "pending" or event_state.status == "cancelled" or event_state.status == "aborted" or event_state.status == "failed" or event_state.status == "paused" then
 		if not event_state.start_time then
@@ -170,13 +170,8 @@ function M:finish()
 
 	event_state.status = "completed"
 	event_state.last_update_time = current_time
-	if not event_state.start_time then
-		event_state.start_time = current_time
-	end
-	if not event_state.end_time then
-		event_state.end_time = current_time
-	end
-	state.set_event_state(event_id, event_state)
+	event_state.start_time = event_state.start_time or current_time
+	event_state.end_time = event_state.end_time or current_time
 	self.state = event_state
 
 	lifecycle.on_end(event_id, event_data)
@@ -217,10 +212,10 @@ function M:start()
 		local end_time = processor.calculate_end_time(event_state, event_state.start_time)
 		event_state.end_time = end_time
 	end
-	state.set_event_state(event_id, event_state)
+
 	self.state = event_state
 
-	local event_data = { id = event_id, category = event_state.category, payload = event_state.payload }
+	local event_data = { event_id = event_id, category = event_state.category, payload = event_state.payload }
 	lifecycle.on_start(event_id, event_data)
 	lifecycle.on_enabled(event_id, event_data)
 
@@ -248,7 +243,6 @@ function M:cancel()
 
 	event_state.status = "cancelled"
 	event_state.last_update_time = time.get_time()
-	state.set_event_state(event_id, event_state)
 	self.state = event_state
 
 	return true
@@ -275,11 +269,10 @@ function M:pause()
 
 	event_state.status = "paused"
 	event_state.last_update_time = time.get_time()
-	state.set_event_state(event_id, event_state)
 	self.state = event_state
 
 	local event_data = {
-		id = event_id,
+		event_id = event_id,
 		category = event_state.category,
 		payload = event_state.payload,
 		status = "paused",
@@ -327,11 +320,10 @@ function M:resume()
 
 	event_state.status = "active"
 	event_state.last_update_time = current_time
-	state.set_event_state(event_id, event_state)
 	self.state = event_state
 
 	local event_data = {
-		id = event_id,
+		event_id = event_id,
 		category = event_state.category,
 		payload = event_state.payload,
 		status = "active",

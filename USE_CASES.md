@@ -200,16 +200,16 @@ schedule.event("event_new_year")
 	:payload({ event_id = "new_year" })
 	:min_time(1 * schedule.DAY) -- do not start if not enough time left
 	:on_start(function(event) -- Once per event activation
-		print("Event started: " .. event.id)
+		print("Event started: " .. event.event_id)
 	end)
 	:on_enabled(function(event) -- When event is started or started at game start
-		print("Event enabled: " .. event.id)
+		print("Event enabled: " .. event.event_id)
 	end)
 	:on_disabled(function(event) -- When event is disabled
-		print("Event disabled: " .. event.id)
+		print("Event disabled: " .. event.event_id)
 	end)
 	:on_end(function(event) -- When event is ended
-		print("Event ended: " .. event.id)
+		print("Event ended: " .. event.event_id)
 	end)
 	:abort_on_fail() -- When event fails condition, set status to "aborted"
 	:save()

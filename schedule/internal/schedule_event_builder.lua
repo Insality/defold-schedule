@@ -10,12 +10,12 @@ local M = {}
 
 
 ---Create a new event builder instance (internal - use schedule.event() instead).
----@param id string|nil Unique identifier for the event for persistence, or nil to generate a random one
+---@param event_id string|nil Unique identifier for the event for persistence, or nil to generate a random one
 ---@return schedule.event_builder New builder instance
-function M.create(id)
+function M.create(event_id)
 	local self = setmetatable({}, { __index = M })
 	self.config = {
-		id = id,
+		event_id = event_id,
 	}
 	return self
 end
@@ -229,8 +229,8 @@ function M:save()
 	local event_id = nil
 	local existing_state = nil
 
-	if self.config.id then
-		event_id = self.config.id
+	if self.config.event_id then
+		event_id = self.config.event_id
 		existing_state = state.get_event_state(event_id)
 	else
 		event_id = state.get_next_event_id()
@@ -269,7 +269,7 @@ function M:save()
 		end
 
 		state.set_event_state(event_id, {
-			id = self.config.id,
+			event_id = event_id,
 			status = initial_status,
 			start_time = calculated_start_time,
 			end_time = calculated_end_time,
@@ -329,7 +329,7 @@ function M:save()
 		end
 
 		state.set_event_state(event_id, {
-			id = self.config.id,
+			event_id = event_id,
 			status = initial_status,
 			start_time = calculated_start_time,
 			end_time = calculated_end_time,

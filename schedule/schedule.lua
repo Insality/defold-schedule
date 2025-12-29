@@ -13,7 +13,7 @@
 ---	:save()
 ---
 ---schedule.on_event:subscribe(function(event)
----	print("Event activated:", event.id)
+---	print("Event activated:", event.event_id)
 ---end)
 ---
 ---timer.delay(1/60, true, function()
@@ -47,7 +47,7 @@ M.WEEK = 604800
 ---Late subscribers receive queued events, ideal for UI that needs to catch up. Use for cross-cutting
 ---concerns (logging, analytics); use lifecycle callbacks for event-specific logic.
 ---Callback: `fun(event: table): boolean|nil` (return `true` to mark as handled)
----Event table contains: `callback_type`, `id`, `category`, `payload`, `status`, `start_time`, `end_time`
+---Event table contains: `callback_type`, `event_id`, `category`, `payload`, `status`, `start_time`, `end_time`
 ---@class schedule.queue.on_event: queue
 ---@field push fun(_, event: table)
 ---@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): any

@@ -29,7 +29,7 @@ return function()
 			schedule.update()
 			assert(start_called, "on_start should be called")
 			assert(start_event ~= nil, "Event should be passed to callback")
-			assert(start_event.id == event:get_id(), "Event ID should match")
+			assert(start_event.event_id == event:get_id(), "Event ID should match")
 		end)
 
 
@@ -259,7 +259,7 @@ return function()
 			for _, e in ipairs(events) do
 				if e.callback_type == "disabled" then
 					has_disabled_event = true
-					assert(e.id == event:get_id(), "Disabled event should have correct ID")
+					assert(e.event_id == event:get_id(), "Disabled event should have correct ID")
 					break
 				end
 			end
@@ -295,7 +295,7 @@ return function()
 			for _, e in ipairs(events) do
 				if e.callback_type == "enabled" then
 					has_enabled_event = true
-					assert(e.id == event:get_id(), "Enabled event should have correct ID")
+					assert(e.event_id == event:get_id(), "Enabled event should have correct ID")
 					break
 				end
 			end
@@ -334,7 +334,7 @@ return function()
 			for _, e in ipairs(events) do
 				if e.callback_type == "fail" then
 					has_fail_event = true
-					assert(e.id == event:get_id(), "Fail event should have correct ID")
+					assert(e.event_id == event:get_id(), "Fail event should have correct ID")
 					break
 				end
 			end

@@ -31,7 +31,7 @@ return function()
 			schedule.update()
 			assert(event_received, "Event should be received")
 			assert(received_event ~= nil, "Event should be passed to subscriber")
-			assert(received_event.id == event:get_id(), "Event ID should match")
+			assert(received_event.event_id == event:get_id(), "Event ID should match")
 		end)
 
 

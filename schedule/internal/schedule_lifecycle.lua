@@ -70,7 +70,7 @@ local CALLBACK_TO_EVENT = {
 function M.push_event(event_type, event_data)
 	M.event_queue:push({
 		callback_type = event_type,
-		id = event_data.id,
+		event_id = event_data.event_id,
 		category = event_data.category,
 		payload = event_data.payload,
 		status = event_data.status,
@@ -94,7 +94,7 @@ function M.trigger_callback(event_id, callback_type, event_data)
 			logger:error("Lifecycle callback failed", {
 				callback = callback_type,
 				error = tostring(err),
-				event_id = event_data.id
+				event_id = event_data.event_id
 			})
 		end
 	end
