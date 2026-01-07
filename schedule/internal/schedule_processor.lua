@@ -208,26 +208,26 @@ function M.process_cycle(event_id, event_state, current_time)
 
 		if catch_up and not skip_missed then
 			local processed_cycles = {}
-		local anchor = event_state.cycle.anchor or "start"
-		local cycle_interval = event_state.cycle.seconds
-		local next_cycle_time = nil
-		local max_catches = event_state.cycle.max_catches
-		local catch_count = 0
+			local anchor = event_state.cycle.anchor or "start"
+			local cycle_interval = event_state.cycle.seconds
+			local next_cycle_time = nil
+			local max_catches = event_state.cycle.max_catches
+			local catch_count = 0
 
-		if cycle_interval and event_state.start_time then
-			local base_time
-			if anchor == "end" and event_state.end_time then
-				base_time = event_state.end_time
-			else
-				base_time = event_state.start_time
-			end
-
-			local cycle_start = base_time + cycle_interval
-			while cycle_start and cycle_start <= current_time do
-				if max_catches and catch_count >= max_catches then
-					break
+			if cycle_interval and event_state.start_time then
+				local base_time
+				if anchor == "end" and event_state.end_time then
+					base_time = event_state.end_time
+				else
+					base_time = event_state.start_time
 				end
-				local cycle_end = M.calculate_end_time(event_state, cycle_start)
+
+				local cycle_start = base_time + cycle_interval
+				while cycle_start and cycle_start <= current_time do
+					if max_catches and catch_count >= max_catches then
+						break
+					end
+					local cycle_end = M.calculate_end_time(event_state, cycle_start)
 					if cycle_end and cycle_end <= current_time then
 						table.insert(processed_cycles, cycle_start)
 						catch_count = catch_count + 1

@@ -117,9 +117,8 @@ end
 ---@param data any Data passed to the condition evaluator function
 ---@return schedule.event_builder Self for method chaining
 function M:condition(name, data)
-	if not self.config.conditions then
-		self.config.conditions = {}
-	end
+	self.config.conditions = self.config.conditions or {}
+
 	table.insert(self.config.conditions, {
 		name = name,
 		data = data
@@ -215,7 +214,6 @@ function M:abort_on_fail()
 	self.config.abort_on_fail = true
 	return self
 end
-
 
 
 ---Save the event to the schedule system and return the event instance. Call as the final step after configuration.

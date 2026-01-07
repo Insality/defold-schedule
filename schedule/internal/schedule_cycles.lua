@@ -16,13 +16,11 @@ function M.calculate_next_every(cycle_config, current_time, last_cycle_time, anc
 	end
 
 	local anchor = cycle_config.anchor or "start"
-	local base_time
+	local base_time = current_time
 	if anchor == "end" and last_cycle_time then
 		base_time = last_cycle_time
 	elseif anchor_time then
 		base_time = anchor_time
-	else
-		base_time = current_time
 	end
 
 	local next_time = base_time + cycle_config.seconds
