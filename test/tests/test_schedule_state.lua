@@ -26,7 +26,7 @@ return function()
 			time = 60
 			schedule.update()
 
-			local state = schedule.get_state()
+			local state = deep_copy_state(schedule.get_state())
 			assert(state ~= nil, "State should exist")
 
 			schedule.reset_state()
@@ -130,7 +130,7 @@ return function()
 			time = 300
 			schedule.update()
 
-			local state = schedule.get_state()
+			local state = deep_copy_state(schedule.get_state())
 			schedule.reset_state()
 			schedule.set_state(state)
 

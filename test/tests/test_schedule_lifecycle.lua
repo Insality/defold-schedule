@@ -361,7 +361,8 @@ return function()
 			assert(event1:get_status() == "active", "Event1 should be active")
 			assert(event2:get_status() == "active", "Event2 should be active")
 
-			local saved_state = schedule.get_state()
+			local saved_state = sys.deserialize(sys.serialize(schedule.get_state()))
+
 			schedule.reset_state()
 			schedule_time.set_time_function(function() return time end)
 
@@ -433,7 +434,7 @@ return function()
 			assert(event2:get_status() == "active", "Event2 should be active")
 			assert(event3:get_status() == "pending", "Event3 should be pending")
 
-			local saved_state = schedule.get_state()
+			local saved_state = sys.deserialize(sys.serialize(schedule.get_state()))
 			schedule.reset_state()
 			schedule_time.set_time_function(function() return time end)
 
