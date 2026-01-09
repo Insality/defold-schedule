@@ -369,6 +369,7 @@ return function()
 			local events = {}
 			schedule.on_event:subscribe(function(event)
 				table.insert(events, event)
+				return true
 			end)
 
 			schedule.set_state(saved_state)
@@ -465,9 +466,6 @@ return function()
 				:save()
 
 			schedule.update()
-
-			print("@#")
-			pprint(events)
 
 			local enabled_count = 0
 			for _, e in ipairs(events) do

@@ -8,12 +8,12 @@ local lifecycle = require("schedule.internal.schedule_lifecycle")
 
 local M = {}
 
-local processed_previously_active = false
-local previously_active = {}
-local newly_activated = {}
+local active_events = {}
 
-function M.reset_processed_flag()
-	processed_previously_active = false
+function M.clear_active_events()
+	for k in pairs(active_events) do
+		active_events[k] = nil
+	end
 end
 
 
@@ -473,32 +473,22 @@ function M.update_all(current_time)
 	local all_events = state.get_all_events()
 	local any_updated = false
 
-	for k in pairs(previously_active) do
-		previously_active[k] = nil
-	end
-	for k in pairs(newly_activated) do
-		newly_activated[k] = nil
-	end
-
-	for event_id, event_state in pairs(all_events) do
-		if event_state.status == "active" then
-			previously_active[event_id] = true
+	if next(active_events) == nil then
+		for event_id, event_state in pairs(all_events) do
+			if event_state.status == "active" then
+				local event_data = M._create_event_data(event_id, event_state)
+				lifecycle.on_enabled(event_id, event_data)
+			end
 		end
 	end
 
 	for event_id, event_state in pairs(all_events) do
-		local was_active = event_state.status == "active"
 		local updated = M.update_event(event_id, current_time, last_update_time)
 		if updated then
 			any_updated = true
 		end
-		local event_state_after = state.get_event_state(event_id)
-		if event_state_after and event_state_after.status == "active" and not was_active then
-			newly_activated[event_id] = true
-		end
 	end
 
-	-- Update chained events (events that start after other events complete)
 	local chained_updated = chaining.update_chained_events(
 		all_events,
 		current_time,
@@ -508,21 +498,15 @@ function M.update_all(current_time)
 	)
 	any_updated = any_updated or chained_updated
 
-	all_events = state.get_all_events()
-	for event_id, event_state in pairs(all_events) do
-		if event_state.status == "active" and not previously_active[event_id] then
-			newly_activated[event_id] = true
-		end
+	for k in pairs(active_events) do
+		active_events[k] = nil
 	end
 
-	if not processed_previously_active then
-		for event_id, event_state in pairs(all_events) do
-			if event_state.status == "active" and previously_active[event_id] and not newly_activated[event_id] then
-				local event_data = M._create_event_data(event_id, event_state)
-				lifecycle.on_enabled(event_id, event_data)
-			end
+	all_events = state.get_all_events()
+	for event_id, event_state in pairs(all_events) do
+		if event_state.status == "active" then
+			active_events[event_id] = true
 		end
-		processed_previously_active = true
 	end
 
 	state.set_last_update_time(current_time)
