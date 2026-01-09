@@ -8,6 +8,14 @@ local lifecycle = require("schedule.internal.schedule_lifecycle")
 
 local M = {}
 
+local processed_previously_active = false
+local previously_active = {}
+local newly_activated = {}
+
+function M.reset_processed_flag()
+	processed_previously_active = false
+end
+
 
 ---Calculate event start time
 ---@param event_state schedule.event.state
@@ -465,9 +473,29 @@ function M.update_all(current_time)
 	local all_events = state.get_all_events()
 	local any_updated = false
 
+	for k in pairs(previously_active) do
+		previously_active[k] = nil
+	end
+	for k in pairs(newly_activated) do
+		newly_activated[k] = nil
+	end
+
 	for event_id, event_state in pairs(all_events) do
+		if event_state.status == "active" then
+			previously_active[event_id] = true
+		end
+	end
+
+	for event_id, event_state in pairs(all_events) do
+		local was_active = event_state.status == "active"
 		local updated = M.update_event(event_id, current_time, last_update_time)
-		updated = updated or any_updated
+		if updated then
+			any_updated = true
+		end
+		local event_state_after = state.get_event_state(event_id)
+		if event_state_after and event_state_after.status == "active" and not was_active then
+			newly_activated[event_id] = true
+		end
 	end
 
 	-- Update chained events (events that start after other events complete)
@@ -479,6 +507,23 @@ function M.update_all(current_time)
 		M.update_event
 	)
 	any_updated = any_updated or chained_updated
+
+	all_events = state.get_all_events()
+	for event_id, event_state in pairs(all_events) do
+		if event_state.status == "active" and not previously_active[event_id] then
+			newly_activated[event_id] = true
+		end
+	end
+
+	if not processed_previously_active then
+		for event_id, event_state in pairs(all_events) do
+			if event_state.status == "active" and previously_active[event_id] and not newly_activated[event_id] then
+				local event_data = M._create_event_data(event_id, event_state)
+				lifecycle.on_enabled(event_id, event_data)
+			end
+		end
+		processed_previously_active = true
+	end
 
 	state.set_last_update_time(current_time)
 	return any_updated

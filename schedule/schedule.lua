@@ -63,6 +63,7 @@ function M.reset_state()
 	conditions.reset()
 	M.on_event:clear()
 	time.set_time_function(nil)
+	processor.reset_processed_flag()
 end
 
 
@@ -79,6 +80,7 @@ end
 ---@param new_state schedule.state State object previously obtained from `get_state()`
 function M.set_state(new_state)
 	state.set_state(new_state)
+	processor.reset_processed_flag()
 end
 
 
