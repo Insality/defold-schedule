@@ -34,17 +34,22 @@ end
 ---Set event to start after a relative delay or after another event completes (event chaining).
 ---Use for relative timing or sequential events. Use `start_at()` for absolute calendar-based timing.
 ---Set `wait_online = true` in options to wait for first update() call after parent completes (starts counting after player is online, don't include offline time); if false/nil, starts immediately when parent completes.
----@param after number|string Seconds to wait (number) or event ID to chain after (string)
+---@param after number|string|schedule.event Seconds to wait (number) or event ID to chain after (string)
 ---@param options table|nil Options table with `wait_online` (boolean) for chaining behavior
 ---@return schedule.event_builder Self for method chaining
 function M:after(after, options)
-	if type(after) == "string" then
+	if event.is_event(after) then
+		---@cast after schedule.event
+		self.config.after = after:get_id()
+		self.config.after_options = options or {}
+	elseif type(after) == "string" then
 		self.config.after = after
 		self.config.after_options = options or {}
 	else
 		self.config.after = after
 		self.config.after_options = options
 	end
+
 	return self
 end
 

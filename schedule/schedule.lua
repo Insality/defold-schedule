@@ -14,9 +14,10 @@
 ---
 ---schedule.on_event:subscribe(function(event)
 ---	print("Event activated:", event.event_id)
+--- return true -- Required if event is handled
 ---end)
 ---
----timer.delay(1/60, true, function()
+---timer.delay(1, true, function()
 ---	schedule.update()
 ---end)
 ---```

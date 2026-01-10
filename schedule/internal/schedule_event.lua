@@ -7,13 +7,22 @@ local processor = require("schedule.internal.schedule_processor")
 ---@class schedule.event
 ---@field state schedule.event.state
 local M = {}
+local METATABLE = { __index = M }
 
 
 ---Create event instance
 ---@param event_state schedule.event.state
 ---@return schedule.event event Event instance
 function M.create(event_state)
-	return setmetatable({ state = event_state }, { __index = M })
+	return setmetatable({ state = event_state }, METATABLE)
+end
+
+
+---Check if value is an event
+---@param value any
+---@return boolean is_event True if value is an schedule event
+function M.is_event(value)
+	return type(value) == "table" and getmetatable(value) == METATABLE
 end
 
 

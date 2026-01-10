@@ -20,7 +20,7 @@ return function()
 
 			local craft_2 = schedule.event()
 				:category("craft")
-				:after(craft_1:get_id())
+				:after(craft_1)
 				:duration(120)
 				:save()
 
@@ -39,7 +39,6 @@ return function()
 			assert(craft_1:get_status() == "completed")
 			assert(craft_2:get_status() == "active", "Second event should start after first completes")
 		end)
-
 
 		it("Should chain event with wait_online false (default)", function()
 			local craft_1 = schedule.event()
@@ -62,6 +61,10 @@ return function()
 			schedule.update()
 			assert(craft_1:get_status() == "completed")
 			assert(craft_2:get_status() == "active", "Second event should start after first completes")
+
+			time = 190
+			schedule.update()
+			assert(craft_2:get_time_left() == 110, "Second event should have 110 seconds left")
 		end)
 
 

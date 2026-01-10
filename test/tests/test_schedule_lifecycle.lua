@@ -195,6 +195,7 @@ return function()
 			local events = {}
 			schedule.on_event:subscribe(function(event)
 				table.insert(events, event)
+				return true
 			end)
 
 			local event = schedule.event()
@@ -235,6 +236,7 @@ return function()
 			local events = {}
 			schedule.on_event:subscribe(function(event)
 				table.insert(events, event)
+				return true
 			end)
 
 			local disabled_called = false
@@ -271,6 +273,7 @@ return function()
 			local events = {}
 			schedule.on_event:subscribe(function(event)
 				table.insert(events, event)
+				return true
 			end)
 
 			local enabled_called = false
@@ -311,6 +314,7 @@ return function()
 			local events = {}
 			schedule.on_event:subscribe(function(event)
 				table.insert(events, event)
+				return true
 			end)
 
 			local fail_called = false
