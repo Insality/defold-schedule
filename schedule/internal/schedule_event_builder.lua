@@ -361,8 +361,6 @@ function M:save()
 	lifecycle.register_callback(event_id, "on_end", self.config.on_end)
 	lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
 
-	self.event_id = event_id
-
 	local event_state = state.get_event_state(event_id)
 	assert(event_state, "Event state must exist")
 	local event_instance = event.create(event_state)
