@@ -247,12 +247,7 @@ function M:save()
 		local initial_status = existing_state.status or "pending"
 
 		if self.config.start_at then
-			local start_at = self.config.start_at
-			if type(start_at) == "string" then
-				calculated_start_time = time.parse_iso_date(start_at)
-			elseif type(start_at) == "number" then
-				calculated_start_time = start_at
-			end
+			calculated_start_time = time.normalize_time(self.config.start_at)
 		elseif self.config.after then
 			local after = self.config.after
 			if type(after) == "number" then
@@ -261,12 +256,7 @@ function M:save()
 		end
 
 		if self.config.end_at then
-			local end_at = self.config.end_at
-			if type(end_at) == "string" then
-				calculated_end_time = time.parse_iso_date(end_at)
-			elseif type(end_at) == "number" then
-				calculated_end_time = end_at
-			end
+			calculated_end_time = time.normalize_time(self.config.end_at)
 		elseif self.config.duration and calculated_start_time then
 			calculated_end_time = calculated_start_time + self.config.duration
 		end
@@ -299,12 +289,7 @@ function M:save()
 		local initial_status = "pending"
 
 		if self.config.start_at then
-			local start_at = self.config.start_at
-			if type(start_at) == "string" then
-				calculated_start_time = time.parse_iso_date(start_at)
-			elseif type(start_at) == "number" then
-				calculated_start_time = start_at
-			end
+			calculated_start_time = time.normalize_time(self.config.start_at)
 		elseif self.config.after then
 			local after = self.config.after
 			if type(after) == "number" then
@@ -315,12 +300,7 @@ function M:save()
 		end
 
 		if self.config.end_at then
-			local end_at = self.config.end_at
-			if type(end_at) == "string" then
-				calculated_end_time = time.parse_iso_date(end_at)
-			elseif type(end_at) == "number" then
-				calculated_end_time = end_at
-			end
+			calculated_end_time = time.normalize_time(self.config.end_at)
 		elseif self.config.duration and calculated_start_time then
 			calculated_end_time = calculated_start_time + self.config.duration
 		end

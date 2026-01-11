@@ -59,6 +59,19 @@ function M.get_time()
 end
 
 
+---Normalize time value (string or number) to timestamp
+---@param value string|number|nil ISO date string or timestamp
+---@return number|nil Timestamp in seconds, nil if invalid
+function M.normalize_time(value)
+	if type(value) == "string" then
+		return M.parse_iso_date(value)
+	elseif type(value) == "number" then
+		return value
+	end
+	return nil
+end
+
+
 ---Parse ISO date string to timestamp
 ---@param iso_string string ISO date string (e.g., "2026-01-01T00:00:00")
 ---@return number|nil Timestamp in seconds, nil if invalid

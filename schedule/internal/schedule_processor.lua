@@ -24,13 +24,7 @@ end
 ---@return number|nil start_time Calculated start time in seconds, or nil if cannot be calculated
 function M.calculate_start_time(event_state, current_time, last_update_time)
 	if event_state.start_at then
-		local start_at = event_state.start_at
-		if type(start_at) == "string" then
-			return time.parse_iso_date(start_at)
-		elseif type(start_at) == "number" then
-			return start_at
-		end
-		return nil
+		return time.normalize_time(event_state.start_at)
 	elseif event_state.after then
 		local after = event_state.after
 		if type(after) == "string" then
@@ -58,13 +52,7 @@ function M.calculate_end_time(event_state, start_time)
 	end
 
 	if event_state.end_at then
-		local end_at = event_state.end_at
-		if type(end_at) == "string" then
-			return time.parse_iso_date(end_at)
-		elseif type(end_at) == "number" then
-			return end_at
-		end
-		return nil
+		return time.normalize_time(event_state.end_at)
 	elseif event_state.duration then
 		return start_time + event_state.duration
 	end
