@@ -221,6 +221,95 @@ function M:abort_on_fail()
 end
 
 
+---Calculate start time from config
+---@param config table Builder config
+---@param current_time number Current time
+---@param existing_start_time number|nil Existing start time to preserve (nil for new events)
+---@return number|nil calculated_start_time
+function M._calculate_start_time(config, current_time, existing_start_time)
+	if config.start_at then
+		return time.normalize_time(config.start_at)
+	elseif config.after then
+		if type(config.after) == "number" then
+			return current_time + config.after
+		end
+		return existing_start_time
+	else
+		return existing_start_time or current_time
+	end
+end
+
+
+---Calculate end time from config
+---@param config table Builder config
+---@param start_time number|nil Calculated start time
+---@param existing_end_time number|nil Existing end time to preserve (nil for new events)
+---@return number|nil calculated_end_time
+function M._calculate_end_time(config, start_time, existing_end_time)
+	if config.end_at then
+		return time.normalize_time(config.end_at)
+	elseif config.duration and start_time then
+		return start_time + config.duration
+	end
+	return existing_end_time
+end
+
+
+---Determine initial status for new event
+---@param config table Builder config
+---@param current_time number Current time
+---@param start_time number|nil Calculated start time
+---@param end_time number|nil Calculated end time
+---@return string initial_status "pending" or "active"
+function M._determine_initial_status(config, current_time, start_time, end_time)
+	if config.end_at and not config.start_at and not config.after then
+		if start_time and current_time >= start_time and end_time and current_time < end_time then
+			return "active"
+		end
+	end
+	return "pending"
+end
+
+
+---Build event state table from config
+---@param config table Builder config
+---@param event_id string Event ID
+---@param current_time number Current time
+---@param existing_state schedule.event.state|nil Existing state (nil for new events)
+---@return schedule.event.state event_state
+function M._build_event_state(config, event_id, current_time, existing_state)
+	local start_time = existing_state and existing_state.start_time or nil
+	local end_time = existing_state and existing_state.end_time or nil
+	local calculated_start_time = M._calculate_start_time(config, current_time, start_time)
+	local calculated_end_time = M._calculate_end_time(config, calculated_start_time, end_time)
+	local initial_status = existing_state and (existing_state.status or "pending")
+		or M._determine_initial_status(config, current_time, calculated_start_time, calculated_end_time)
+
+	return {
+		event_id = event_id,
+		status = initial_status,
+		start_time = calculated_start_time,
+		end_time = calculated_end_time,
+		last_update_time = existing_state and existing_state.last_update_time or nil,
+		cycle_count = existing_state and (existing_state.cycle_count or 0) or 0,
+		next_cycle_time = existing_state and existing_state.next_cycle_time or nil,
+		category = config.category or (existing_state and existing_state.category or nil),
+		payload = config.payload or (existing_state and existing_state.payload or nil),
+		after = config.after or (existing_state and existing_state.after or nil),
+		after_options = config.after_options or (existing_state and existing_state.after_options or nil),
+		start_at = config.start_at or (existing_state and existing_state.start_at or nil),
+		end_at = config.end_at or (existing_state and existing_state.end_at or nil),
+		duration = config.duration or (existing_state and existing_state.duration or nil),
+		infinity = config.infinity ~= nil and config.infinity or (existing_state and existing_state.infinity or nil),
+		cycle = config.cycle or (existing_state and existing_state.cycle or nil),
+		conditions = config.conditions or (existing_state and existing_state.conditions or nil),
+		abort_on_fail = config.abort_on_fail ~= nil and config.abort_on_fail or (existing_state and existing_state.abort_on_fail or nil),
+		catch_up = config.catch_up ~= nil and config.catch_up or (existing_state and existing_state.catch_up or nil),
+		min_time = config.min_time or (existing_state and existing_state.min_time or nil)
+	}
+end
+
+
 ---Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 ---Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
 ---and callbacks are registered. If an existing event with the same ID exists, its state is merged.
@@ -228,112 +317,11 @@ end
 ---@return schedule.event Event instance (builder also acts as event object)
 function M:save()
 	local current_time = time.get_time()
+	local event_id = self.config.event_id or state.get_next_event_id()
+	local existing_state = event_id and state.get_event_state(event_id) or nil
 
-	local event_id = nil
-	local existing_state = nil
-
-	if self.config.event_id then
-		event_id = self.config.event_id
-		existing_state = state.get_event_state(event_id)
-	else
-		event_id = state.get_next_event_id()
-	end
-
-	assert(event_id ~= nil, "Event ID must be generated")
-
-	if existing_state then
-		local calculated_start_time = existing_state.start_time
-		local calculated_end_time = existing_state.end_time
-		local initial_status = existing_state.status or "pending"
-
-		if self.config.start_at then
-			calculated_start_time = time.normalize_time(self.config.start_at)
-		elseif self.config.after then
-			local after = self.config.after
-			if type(after) == "number" then
-				calculated_start_time = current_time + after
-			end
-		end
-
-		if self.config.end_at then
-			calculated_end_time = time.normalize_time(self.config.end_at)
-		elseif self.config.duration and calculated_start_time then
-			calculated_end_time = calculated_start_time + self.config.duration
-		end
-
-		state.set_event_state(event_id, {
-			event_id = event_id,
-			status = initial_status,
-			start_time = calculated_start_time,
-			end_time = calculated_end_time,
-			last_update_time = existing_state.last_update_time,
-			cycle_count = existing_state.cycle_count or 0,
-			next_cycle_time = existing_state.next_cycle_time,
-			category = self.config.category or existing_state.category,
-			payload = self.config.payload or existing_state.payload,
-			after = self.config.after or existing_state.after,
-			after_options = self.config.after_options or existing_state.after_options,
-			start_at = self.config.start_at or existing_state.start_at,
-			end_at = self.config.end_at or existing_state.end_at,
-			duration = self.config.duration or existing_state.duration,
-			infinity = self.config.infinity ~= nil and self.config.infinity or existing_state.infinity,
-			cycle = self.config.cycle or existing_state.cycle,
-			conditions = self.config.conditions or existing_state.conditions,
-			abort_on_fail = self.config.abort_on_fail ~= nil and self.config.abort_on_fail or existing_state.abort_on_fail,
-			catch_up = self.config.catch_up ~= nil and self.config.catch_up or existing_state.catch_up,
-			min_time = self.config.min_time or existing_state.min_time
-		})
-	else
-		local calculated_start_time = nil
-		local calculated_end_time = nil
-		local initial_status = "pending"
-
-		if self.config.start_at then
-			calculated_start_time = time.normalize_time(self.config.start_at)
-		elseif self.config.after then
-			local after = self.config.after
-			if type(after) == "number" then
-				calculated_start_time = current_time + after
-			end
-		else
-			calculated_start_time = current_time
-		end
-
-		if self.config.end_at then
-			calculated_end_time = time.normalize_time(self.config.end_at)
-		elseif self.config.duration and calculated_start_time then
-			calculated_end_time = calculated_start_time + self.config.duration
-		end
-
-		if self.config.end_at and not self.config.start_at and not self.config.after then
-			if calculated_start_time and current_time >= calculated_start_time and calculated_end_time and current_time < calculated_end_time then
-				initial_status = "active"
-			end
-		end
-
-		state.set_event_state(event_id, {
-			event_id = event_id,
-			status = initial_status,
-			start_time = calculated_start_time,
-			end_time = calculated_end_time,
-			last_update_time = nil,
-			cycle_count = 0,
-			next_cycle_time = nil,
-			category = self.config.category,
-			payload = self.config.payload,
-			after = self.config.after,
-			after_options = self.config.after_options,
-			start_at = self.config.start_at,
-			end_at = self.config.end_at,
-			duration = self.config.duration,
-			infinity = self.config.infinity,
-			cycle = self.config.cycle,
-			conditions = self.config.conditions,
-			abort_on_fail = self.config.abort_on_fail,
-			catch_up = self.config.catch_up,
-			min_time = self.config.min_time
-		})
-	end
+	local event_state = M._build_event_state(self.config, event_id, current_time, existing_state)
+	state.set_event_state(event_id, event_state)
 
 	lifecycle.register_callback(event_id, "on_start", self.config.on_start)
 	lifecycle.register_callback(event_id, "on_enabled", self.config.on_enabled)
@@ -341,9 +329,9 @@ function M:save()
 	lifecycle.register_callback(event_id, "on_end", self.config.on_end)
 	lifecycle.register_callback(event_id, "on_fail", self.config.on_fail)
 
-	local event_state = state.get_event_state(event_id)
-	assert(event_state, "Event state must exist")
-	local event_instance = event.create(event_state)
+	local saved_state = state.get_event_state(event_id)
+	assert(saved_state, "Event state must exist")
+	local event_instance = event.create(saved_state)
 
 	logger:debug("Event saved", { event_id = event_id, category = self.config.category })
 	return event_instance
