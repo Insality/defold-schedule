@@ -571,7 +571,15 @@ function M.update_all(current_time)
 		end
 	end
 
+	local events_to_update = {}
 	for event_id, event_state in pairs(all_events) do
+		local status = event_state.status
+		if M._is_startable_status(status) or status == "paused" or status == "active" or (status == "completed" and event_state.cycle) then
+			events_to_update[event_id] = true
+		end
+	end
+
+	for event_id, _ in pairs(events_to_update) do
 		local updated = M.update_event(event_id, current_time, last_update_time)
 		if updated then
 			any_updated = true
