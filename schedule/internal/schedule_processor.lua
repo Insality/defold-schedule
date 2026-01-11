@@ -188,6 +188,233 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 end
 
 
+---Activate a cycle for an event
+---@param event_id string
+---@param event_state schedule.event.state
+---@param new_start_time number
+---@param new_end_time number|nil
+function M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
+	event_state.status = "active"
+	event_state.start_time = new_start_time
+	event_state.end_time = new_end_time
+	event_state.cycle_count = (event_state.cycle_count or 0) + 1
+	event_state.next_cycle_time = nil
+
+	M._update_chained_events(event_id)
+
+	local event_data = M._create_event_data(event_id, event_state)
+	lifecycle.on_start(event_id, event_data)
+	lifecycle.on_enabled(event_id, event_data)
+end
+
+
+---Check if cycle should be skipped due to min_time
+---@param event_state schedule.event.state
+---@param new_start_time number
+---@param new_end_time number|nil
+---@param current_time number
+---@return boolean should_skip True if cycle should be skipped
+---@return number|nil next_cycle_time Next cycle time if skipped
+function M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
+	if not event_state.min_time or not new_end_time then
+		return false, nil
+	end
+
+	local remaining = new_end_time - current_time
+	if remaining < event_state.min_time then
+		local skipped_cycle_time = cycles.calculate_next_cycle(
+			event_state.cycle,
+			current_time,
+			new_end_time,
+			event_state.start_time
+		)
+		return true, skipped_cycle_time
+	end
+
+	return false, nil
+end
+
+
+---Collect missed cycles for catch-up
+---@param event_state schedule.event.state
+---@param current_time number
+---@return table processed_cycles Array of cycle start times
+---@return number|nil next_cycle_time Next cycle time if any
+function M._collect_catchup_cycles(event_state, current_time)
+	local processed_cycles = {}
+	local cycle_config = event_state.cycle
+	if not cycle_config then
+		return processed_cycles, nil
+	end
+
+	local anchor = cycle_config.anchor or "start"
+	local cycle_interval = cycle_config.seconds
+	local max_catches = cycle_config.max_catches
+
+	if not cycle_interval or not event_state.start_time then
+		return processed_cycles, nil
+	end
+
+	local base_time = (anchor == "end" and event_state.end_time) or event_state.start_time
+	local cycle_start = base_time + cycle_interval
+	local catch_count = 0
+
+	while cycle_start <= current_time do
+		if max_catches and catch_count >= max_catches then
+			break
+		end
+
+		local cycle_end = M.calculate_end_time(event_state, cycle_start)
+		if not cycle_end or cycle_end > current_time then
+			break
+		end
+
+		table.insert(processed_cycles, cycle_start)
+		catch_count = catch_count + 1
+		cycle_start = cycle_start + cycle_interval
+	end
+
+	local next_cycle_time = (cycle_start > current_time) and cycle_start or nil
+	return processed_cycles, next_cycle_time
+end
+
+
+---Process catch-up cycles for completed event
+---@param event_id string
+---@param event_state schedule.event.state
+---@param current_time number
+---@return boolean processed True if cycles were processed
+function M._process_catchup_cycles(event_id, event_state, current_time)
+	local cycle_config = event_state.cycle
+	if not cycle_config then
+		return false
+	end
+
+	local skip_missed = cycle_config.skip_missed
+	local catch_up = event_state.catch_up
+
+	if not catch_up or skip_missed then
+		return false
+	end
+
+	local processed_cycles, next_cycle_time = M._collect_catchup_cycles(event_state, current_time)
+
+	if #processed_cycles == 0 then
+		return false
+	end
+
+	for i = 1, #processed_cycles do
+		local cycle_time = processed_cycles[i]
+		local new_start_time = cycle_time
+		local new_end_time = M.calculate_end_time(event_state, new_start_time)
+
+		if new_end_time then
+			M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
+
+			if current_time >= new_end_time then
+				M._complete_event(event_id, event_state, new_start_time, new_end_time, current_time)
+			end
+		end
+	end
+
+	event_state.next_cycle_time = (next_cycle_time and next_cycle_time > current_time) and next_cycle_time or nil
+	return true
+end
+
+
+---Get or calculate next cycle time
+---@param event_state schedule.event.state
+---@param current_time number
+---@return number|nil next_cycle_time
+function M._get_next_cycle_time(event_state, current_time)
+	if event_state.next_cycle_time then
+		return event_state.next_cycle_time
+	end
+
+	return cycles.calculate_next_cycle(
+		event_state.cycle,
+		current_time,
+		event_state.end_time,
+		event_state.start_time
+	)
+end
+
+
+---Skip missed cycles when skip_missed is true
+---@param event_state schedule.event.state
+---@param next_cycle_time number
+---@param current_time number
+---@return number|nil adjusted_cycle_time
+function M._skip_missed_cycles(event_state, next_cycle_time, current_time)
+	local cycle_config = event_state.cycle
+	if not cycle_config then
+		return next_cycle_time
+	end
+
+	local skip_missed = cycle_config.skip_missed
+
+	if not skip_missed then
+		return next_cycle_time
+	end
+
+	while next_cycle_time and next_cycle_time < current_time do
+		local calculated = cycles.calculate_next_cycle(
+			cycle_config,
+			current_time,
+			next_cycle_time,
+			event_state.start_time
+		)
+		if not calculated then
+			break
+		end
+		next_cycle_time = calculated
+	end
+
+	return next_cycle_time
+end
+
+
+---Process next cycle for event
+---@param event_id string
+---@param event_state schedule.event.state
+---@param current_time number
+---@return boolean processed True if cycle was processed
+function M._process_next_cycle(event_id, event_state, current_time)
+	local next_cycle_time = M._get_next_cycle_time(event_state, current_time)
+
+	if not next_cycle_time or next_cycle_time > current_time then
+		if next_cycle_time and next_cycle_time > current_time then
+			event_state.next_cycle_time = next_cycle_time
+		end
+		return false
+	end
+
+	local adjusted_cycle_time = M._skip_missed_cycles(event_state, next_cycle_time, current_time)
+	next_cycle_time = adjusted_cycle_time
+
+	if not next_cycle_time or next_cycle_time > current_time then
+		if next_cycle_time and next_cycle_time > current_time then
+			event_state.next_cycle_time = next_cycle_time
+		end
+		return false
+	end
+
+	local new_start_time = next_cycle_time
+	local new_end_time = M.calculate_end_time(event_state, new_start_time)
+
+	local should_skip, skipped_cycle_time = M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
+	if should_skip then
+		if skipped_cycle_time then
+			event_state.next_cycle_time = skipped_cycle_time
+		end
+		return false
+	end
+
+	M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
+	return true
+end
+
+
 ---Process cycle for event
 ---@param event_id string
 ---@param event_state schedule.event.state
@@ -199,136 +426,10 @@ function M.process_cycle(event_id, event_state, current_time)
 	end
 
 	if event_state.status == "completed" then
-		local skip_missed = event_state.cycle.skip_missed
-		local catch_up = event_state.catch_up
-
-		if catch_up and not skip_missed then
-			local processed_cycles = {}
-			local anchor = event_state.cycle.anchor or "start"
-			local cycle_interval = event_state.cycle.seconds
-			local next_cycle_time = nil
-			local max_catches = event_state.cycle.max_catches
-			local catch_count = 0
-
-			if cycle_interval and event_state.start_time then
-				local base_time
-				if anchor == "end" and event_state.end_time then
-					base_time = event_state.end_time
-				else
-					base_time = event_state.start_time
-				end
-
-				local cycle_start = base_time + cycle_interval
-				while cycle_start and cycle_start <= current_time do
-					if max_catches and catch_count >= max_catches then
-						break
-					end
-					local cycle_end = M.calculate_end_time(event_state, cycle_start)
-					if cycle_end and cycle_end <= current_time then
-						table.insert(processed_cycles, cycle_start)
-						catch_count = catch_count + 1
-						cycle_start = cycle_start + cycle_interval
-					else
-						break
-					end
-				end
-
-				if cycle_start and cycle_start > current_time then
-					next_cycle_time = cycle_start
-				end
-			end
-
-			if #processed_cycles > 0 then
-				for i, cycle_time in ipairs(processed_cycles) do
-					if cycle_time then
-						local new_start_time = cycle_time
-						local new_end_time = M.calculate_end_time(event_state, new_start_time)
-						if new_end_time then
-							event_state.status = "active"
-							event_state.start_time = new_start_time
-							event_state.end_time = new_end_time
-							event_state.cycle_count = (event_state.cycle_count or 0) + 1
-
-							M._update_chained_events(event_id)
-
-							local event_data = M._create_event_data(event_id, event_state)
-							lifecycle.on_start(event_id, event_data)
-							lifecycle.on_enabled(event_id, event_data)
-
-							if current_time >= new_end_time then
-								M._complete_event(event_id, event_state, new_start_time, new_end_time, current_time)
-							end
-						end
-					end
-				end
-
-				event_state.next_cycle_time = (next_cycle_time and next_cycle_time > current_time) and next_cycle_time or nil
-
-				return true
-			end
+		if M._process_catchup_cycles(event_id, event_state, current_time) then
+			return true
 		end
-
-		local next_cycle_time = event_state.next_cycle_time
-		if not next_cycle_time then
-			next_cycle_time = cycles.calculate_next_cycle(
-				event_state.cycle,
-				current_time,
-				event_state.end_time,
-				event_state.start_time
-			)
-		end
-
-		if next_cycle_time and next_cycle_time <= current_time then
-			if skip_missed then
-				while next_cycle_time and next_cycle_time < current_time do
-					next_cycle_time = cycles.calculate_next_cycle(
-						event_state.cycle,
-						current_time,
-						next_cycle_time,
-						event_state.start_time
-					)
-				end
-			end
-
-			if next_cycle_time and next_cycle_time <= current_time then
-				local new_start_time = next_cycle_time
-				local new_end_time = M.calculate_end_time(event_state, new_start_time)
-
-				if event_state.min_time and new_end_time then
-					local remaining = new_end_time - current_time
-					if remaining < event_state.min_time then
-						local skipped_cycle_time = cycles.calculate_next_cycle(
-							event_state.cycle,
-							current_time,
-							new_end_time,
-							event_state.start_time
-						)
-						if skipped_cycle_time then
-							event_state.next_cycle_time = skipped_cycle_time
-						end
-						return false
-					end
-				end
-
-				event_state.status = "active"
-				event_state.start_time = new_start_time
-				event_state.end_time = new_end_time
-				event_state.cycle_count = (event_state.cycle_count or 0) + 1
-				event_state.next_cycle_time = nil
-
-				M._update_chained_events(event_id)
-
-				local event_data = M._create_event_data(event_id, event_state)
-				lifecycle.on_start(event_id, event_data)
-				lifecycle.on_enabled(event_id, event_data)
-
-				return true
-			end
-		end
-
-		if next_cycle_time and next_cycle_time > current_time then
-			event_state.next_cycle_time = next_cycle_time
-		end
+		return M._process_next_cycle(event_id, event_state, current_time)
 	end
 
 	return false
@@ -570,9 +671,7 @@ end
 ---@param event_id string
 ---@param all_events table|nil Optional cached events table
 function M._update_chained_events(event_id, all_events)
-	if not all_events then
-		all_events = state.get_all_events()
-	end
+	all_events = all_events or state.get_all_events()
 	for chained_event_id, chained_event_state in pairs(all_events) do
 		if type(chained_event_state.after) == "string" and chained_event_state.after == event_id then
 			if chained_event_state.status == "pending" or chained_event_state.status == "completed" then
