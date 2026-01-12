@@ -1,7 +1,7 @@
 return function()
 	describe("Schedule State", function()
 		local schedule ---@type schedule
-		local schedule_time = require("schedule.internal.schedule_time")
+		local schedule_time
 		local time = 0
 
 		local function deep_copy_state(state)
@@ -11,6 +11,8 @@ return function()
 
 		before(function()
 			schedule = require("schedule.schedule")
+			schedule_time = require("schedule.internal.schedule_time")
+
 			schedule.reset_state()
 			schedule_time.set_time_function(function() return time end)
 			time = 0

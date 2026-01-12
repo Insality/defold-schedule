@@ -1,11 +1,13 @@
 return function()
 	describe("Schedule Infinity", function()
 		local schedule ---@type schedule
-		local schedule_time = require("schedule.internal.schedule_time")
+		local schedule_time
 		local time = 0
 
 		before(function()
 			schedule = require("schedule.schedule")
+			schedule_time = require("schedule.internal.schedule_time")
+
 			schedule.reset_state()
 			schedule_time.set_time_function(function() return time end)
 			time = 0

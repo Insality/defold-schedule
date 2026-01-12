@@ -62,7 +62,6 @@ function M.reset_state()
 	state.reset()
 	lifecycle.reset_callbacks()
 	conditions.reset()
-	M.on_event:clear()
 	time.set_time_function(nil)
 	processor.clear_active_events()
 end
