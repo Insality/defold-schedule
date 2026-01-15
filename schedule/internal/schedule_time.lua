@@ -45,17 +45,17 @@ end
 local get_time_callback = socket.gettime
 
 
----Set custom time function callback
----@param callback (fun():number)|nil
-function M.set_time_function(callback)
-	get_time_callback = callback or socket.gettime
-end
-
-
 ---Get current time in seconds
 ---@return number
 function M.get_time()
 	return get_time_callback()
+end
+
+
+---Set custom time function callback
+---@param callback (fun():number)|nil
+function M.set_time_function(callback)
+	get_time_callback = callback or socket.gettime
 end
 
 
