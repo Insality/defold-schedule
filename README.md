@@ -39,6 +39,13 @@ The library is designed to cover casual game needs such as crafting, cooldowns, 
 
 Open your `game.project` file and add the following line to the dependencies field under the project section:
 
+
+**[Defold Event](https://github.com/Insality/defold-event)**
+
+```
+https://github.com/Insality/defold-event/archive/refs/tags/14.zip
+```
+
 **[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/1.zip)**
 
 ```
