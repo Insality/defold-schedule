@@ -6,6 +6,11 @@
 
 [![Github-sponsors](https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=#EA4AAA)](https://github.com/sponsors/insality) [![Ko-Fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/insality) [![BuyMeACoffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/insality)
 
+# Disclaimer
+
+This library is still in development and the API is subject to change.
+
+
 # Defold Schedule
 
 **Schedule** is a time-based scheduling library for **Defold**.
@@ -59,19 +64,31 @@ https://github.com/Insality/defold-schedule/archive/refs/tags/1.zip
 ```lua
 local schedule = require("schedule.schedule")
 
--- Events
-schedule.event()
-schedule.get_status(event_id)
-
-schedule.register_condition(condition_name, fun(data))
-
--- State
+schedule.reset_state()
 schedule.get_state()
 schedule.set_state(new_state)
-schedule.reset_state()
 
--- System
+schedule.update()
+
+schedule.event([id])
+schedule.get(event_id)
+schedule.get_status(event_id)
+
+schedule.register_condition(name, [evaluator])
+
+schedule.filter([category], [status])
+
 schedule.set_logger([logger_instance])
+
+-- Time constants
+schedule.SECOND
+schedule.MINUTE
+schedule.HOUR
+schedule.DAY
+schedule.WEEK
+
+-- Global event subscription queue
+schedule.on_event -- queue<schedule.lifecycle.event_data>
 ```
 
 ```lua
@@ -104,6 +121,8 @@ schedule.event()
 
 For detailed API documentation, please refer to:
 - [API Reference](api/schedule_api.md)
+- [Event Builder API](api/schedule_event_builder.md)
+- [Event API](api/schedule_event.md)
 
 
 ## Use Cases

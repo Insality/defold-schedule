@@ -5,6 +5,15 @@ local queue = require("event.queue")
 
 ---@alias schedule.lifecycle.event "on_start"|"on_enabled"|"on_disabled"|"on_end"|"on_fail"
 
+---@class schedule.lifecycle.event_data
+---@field callback_type schedule.lifecycle.event
+---@field event_id string
+---@field category string
+---@field payload any
+---@field status string
+---@field start_time number
+---@field end_time number
+
 local M = {}
 
 
