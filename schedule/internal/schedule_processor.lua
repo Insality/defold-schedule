@@ -537,7 +537,9 @@ function M.update_event(event_id, current_time, last_update_time)
 			end
 		end
 
-		if start_time and current_time >= start_time then
+		-- Catch-up (or other earlier work in this call) may have already moved the event
+		-- out of a startable status; only start/cancel when it is still pending
+		if M._is_startable_status(event_state.status) and start_time and current_time >= start_time then
 			if M._is_below_min_time(event_state, start_time, current_time) then
 				event_state.status = "cancelled"
 				return false

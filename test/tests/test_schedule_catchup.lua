@@ -322,5 +322,29 @@ return function()
 			assert(schedule.get_event_state("with_duration").catch_up == false,
 				"catch_up(false) should override the stored value")
 		end)
+
+
+		it("Should not cancel a caught-up event via min_time after the window ended", function()
+			local ends = 0
+
+			local event = schedule.event("mintime_catchup")
+				:after(10)
+				:duration(100)
+				:min_time(50)
+				:catch_up(true)
+				:on_end(function() ends = ends + 1 end)
+				:save()
+
+			schedule.update()
+
+			-- Window was 10..110; by t=200 the event already finished offline
+			time = 200
+			schedule.update()
+
+			assert(ends == 1, "Catch-up should replay the finished run once, got " .. ends)
+			assert(event:get_status() == "completed",
+				"Caught-up event must stay completed, not be flipped to cancelled by min_time, got "
+					.. event:get_status())
+		end)
 	end)
 end
