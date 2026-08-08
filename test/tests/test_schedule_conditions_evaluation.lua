@@ -40,10 +40,12 @@ return function()
 		end)
 
 
-		it("Should automatically change status to pending when conditions pass after failure", function()
+		it("Should keep retrying while conditions fail without abort_on_fail", function()
 			local condition_value = false
+			local evaluation_count = 0
 
 			schedule.register_condition("dynamic_condition", function(data)
+				evaluation_count = evaluation_count + 1
 				return condition_value
 			end)
 
@@ -52,26 +54,26 @@ return function()
 				:after(60)
 				:duration(120)
 				:condition("dynamic_condition", {})
-				:abort_on_fail()
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(event:get_status() == "aborted" or event:get_status() == "failed", "Event should be aborted when condition fails")
+			assert(event:get_status() == "pending", "Event should stay pending while the condition fails")
+			assert(evaluation_count >= 1, "Condition should be evaluated")
 
+			local initial_count = evaluation_count
 			condition_value = true
 			schedule.update()
-			local status = event:get_status()
-			assert(status == "pending" or status == "active", "Status should change to pending or active when conditions pass")
+			assert(evaluation_count > initial_count, "Condition should be re-evaluated on the next update")
+			assert(event:get_status() == "active", "Event should activate once the condition passes")
 		end)
 
 
-		it("Should re-evaluate conditions when status changes back to startable", function()
+		it("Should not revive an aborted event when conditions pass later", function()
 			local condition_value = false
-			local evaluation_count = 0
+			local fail_count = 0
 
 			schedule.register_condition("count_condition", function(data)
-				evaluation_count = evaluation_count + 1
 				return condition_value
 			end)
 
@@ -81,17 +83,24 @@ return function()
 				:duration(120)
 				:condition("count_condition", {})
 				:abort_on_fail()
+				:on_fail(function() fail_count = fail_count + 1 end)
 				:save()
 
 			time = 60
 			schedule.update()
-			assert(evaluation_count >= 1, "Condition should be evaluated")
+			assert(event:get_status() == "aborted", "Event should be aborted when the condition fails")
+			assert(fail_count == 1, "on_fail should be called once")
 
-			local initial_count = evaluation_count
 			condition_value = true
+			time = 70
 			schedule.update()
-			assert(evaluation_count > initial_count, "Condition should be re-evaluated when status changes")
-			assert(event:get_status() == "pending" or event:get_status() == "active", "Event should become startable")
+			time = 80
+			schedule.update()
+			assert(event:get_status() == "aborted", "Aborted event should stay aborted, it does not retry")
+			assert(fail_count == 1, "on_fail should not be called again, got " .. fail_count)
+
+			assert(event:start(), "An aborted event can still be started explicitly")
+			assert(event:get_status() == "active", "Explicit start should activate the event")
 		end)
 
 

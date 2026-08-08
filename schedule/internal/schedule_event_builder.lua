@@ -3,14 +3,38 @@ local lifecycle = require("schedule.internal.schedule_lifecycle")
 local logger = require("schedule.internal.schedule_logger")
 local event = require("schedule.internal.schedule_event")
 local time = require("schedule.internal.schedule_time")
+local cycles = require("schedule.internal.schedule_cycles")
 
----@class schedule.event_builder : schedule.event
+---The event builder. Configure the event with the chained methods, then call `save()`
+---to store it and get a `schedule.event` back.
+---@class schedule.event_builder
 ---@field config table
 local M = {}
 
 
+---Cycle types accepted by `cycle()`
+local CYCLE_TYPES = {
+	every = true,
+	weekly = true,
+	monthly = true,
+	yearly = true,
+}
+
+
+---Check that a value is a time point: a number of seconds or an ISO date string
+---@param value any
+---@return boolean
+local function is_time_value(value)
+	if type(value) == "number" then
+		return true
+	end
+
+	return type(value) == "string" and time.parse_iso_date(value) ~= nil
+end
+
+
 ---Create a new event builder instance (internal - use schedule.event() instead).
----@param event_id string|nil Unique identifier for the event for persistence, or nil to generate a random one
+---@param event_id string|nil Unique identifier for the event for persistence, or nil to generate one
 ---@return schedule.event_builder New builder instance
 function M.create(event_id)
 	local self = setmetatable({}, { __index = M })
@@ -26,6 +50,8 @@ end
 ---@param category string Category name
 ---@return schedule.event_builder Self for method chaining
 function M:category(category)
+	assert(type(category) == "string", "Event category should be a string")
+
 	self.config.category = category
 	return self
 end
@@ -33,11 +59,17 @@ end
 
 ---Set event to start after a relative delay or after another event completes (event chaining).
 ---Use for relative timing or sequential events. Use `start_at()` for absolute calendar-based timing.
----Set `wait_online = true` in options to wait for first update() call after parent completes (starts counting after player is online, don't include offline time); if false/nil, starts immediately when parent completes.
+---Set `wait_online = true` in options to start counting when the player is back online, so an offline gap
+---between the two events is not spent by this one. Without it the event starts right when the parent ended,
+---which means it can already be finished when the player returns.
 ---@param after number|string|schedule.event Seconds to wait (number) or event ID to chain after (string)
 ---@param options table|nil Options table with `wait_online` (boolean) for chaining behavior
 ---@return schedule.event_builder Self for method chaining
 function M:after(after, options)
+	assert(type(after) == "number" or type(after) == "string" or event.is_event(after),
+		"Event after should be a number of seconds, an event id or an event")
+	assert(options == nil or type(options) == "table", "Event after options should be a table")
+
 	if event.is_event(after) then
 		---@cast after schedule.event
 		self.config.after = after:get_id()
@@ -59,6 +91,8 @@ end
 ---@param start_at number|string Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
 ---@return schedule.event_builder Self for method chaining
 function M:start_at(start_at)
+	assert(is_time_value(start_at), "Event start_at should be a timestamp or an ISO date string (YYYY-MM-DDTHH:MM:SS)")
+
 	self.config.start_at = start_at
 	return self
 end
@@ -69,6 +103,8 @@ end
 ---@param end_at number|string Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
 ---@return schedule.event_builder Self for method chaining
 function M:end_at(end_at)
+	assert(is_time_value(end_at), "Event end_at should be a timestamp or an ISO date string (YYYY-MM-DDTHH:MM:SS)")
+
 	self.config.end_at = end_at
 	return self
 end
@@ -79,6 +115,8 @@ end
 ---@param duration number Duration in seconds (use `schedule.HOUR`, `schedule.DAY`, etc. for clarity)
 ---@return schedule.event_builder Self for method chaining
 function M:duration(duration)
+	assert(type(duration) == "number" and duration >= 0, "Event duration should be a positive number of seconds")
+
 	self.config.duration = duration
 	return self
 end
@@ -101,6 +139,33 @@ end
 ---@param options table Cycle options: `seconds` (for "every"), `weekdays`, `day`, `month`, `time`, `anchor`, `skip_missed`, `max_catches`
 ---@return schedule.event_builder Self for method chaining
 function M:cycle(cycle_type, options)
+	assert(CYCLE_TYPES[cycle_type], "Unknown cycle type: " .. tostring(cycle_type) .. ". Use every, weekly, monthly or yearly")
+	assert(type(options) == "table", "Cycle options should be a table")
+
+	if cycle_type == "every" then
+		assert(type(options.seconds) == "number" and options.seconds > 0,
+			"Cycle 'every' requires a positive seconds option")
+	end
+	if cycle_type == "weekly" then
+		assert(type(options.weekdays) == "table" and #options.weekdays > 0,
+			"Cycle 'weekly' requires a weekdays option, for example { \"sun\" }")
+		for _, weekday in ipairs(options.weekdays) do
+			assert(type(weekday) == "string" and time.weekday_to_number(weekday),
+				"Unknown weekday: " .. tostring(weekday))
+		end
+	end
+	if options.time ~= nil then
+		assert(time.parse_time_string(options.time), "Cycle time should be a HH:MM or HH:MM:SS string")
+	end
+	if options.day ~= nil then
+		assert(type(options.day) == "number" and options.day >= 1 and options.day <= 31, "Cycle day should be between 1 and 31")
+	end
+	if options.month ~= nil then
+		assert(type(options.month) == "number" and options.month >= 1 and options.month <= 12, "Cycle month should be between 1 and 12")
+	end
+	assert(options.anchor == nil or options.anchor == "start" or options.anchor == "end",
+		"Cycle anchor should be 'start' or 'end'")
+
 	self.config.cycle = {
 		type = cycle_type,
 		seconds = options.seconds,
@@ -122,6 +187,8 @@ end
 ---@param data any Data passed to the condition evaluator function
 ---@return schedule.event_builder Self for method chaining
 function M:condition(name, data)
+	assert(type(name) == "string", "Condition name should be a string")
+
 	self.config.conditions = self.config.conditions or {}
 
 	table.insert(self.config.conditions, {
@@ -148,6 +215,8 @@ end
 ---@param catch_up boolean true to enable offline catch-up, false to disable
 ---@return schedule.event_builder Self for method chaining
 function M:catch_up(catch_up)
+	assert(type(catch_up) == "boolean", "Event catch_up should be a boolean")
+
 	self.config.catch_up = catch_up
 	return self
 end
@@ -158,6 +227,8 @@ end
 ---@param min_time number Minimum seconds remaining required to start (use `schedule.DAY`, etc.)
 ---@return schedule.event_builder Self for method chaining
 function M:min_time(min_time)
+	assert(type(min_time) == "number" and min_time >= 0, "Event min_time should be a positive number of seconds")
+
 	self.config.min_time = min_time
 	return self
 end
@@ -168,6 +239,8 @@ end
 ---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
 ---@return schedule.event_builder Self for method chaining
 function M:on_start(callback)
+	assert(type(callback) == "function", "Event on_start callback should be a function")
+
 	self.config.on_start = callback
 	return self
 end
@@ -179,6 +252,8 @@ end
 ---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
 ---@return schedule.event_builder Self for method chaining
 function M:on_enabled(callback)
+	assert(type(callback) == "function", "Event on_enabled callback should be a function")
+
 	self.config.on_enabled = callback
 	return self
 end
@@ -189,6 +264,8 @@ end
 ---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
 ---@return schedule.event_builder Self for method chaining
 function M:on_disabled(callback)
+	assert(type(callback) == "function", "Event on_disabled callback should be a function")
+
 	self.config.on_disabled = callback
 	return self
 end
@@ -199,6 +276,8 @@ end
 ---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
 ---@return schedule.event_builder Self for method chaining
 function M:on_end(callback)
+	assert(type(callback) == "function", "Event on_end callback should be a function")
+
 	self.config.on_end = callback
 	return self
 end
@@ -208,6 +287,8 @@ end
 ---@param callback function Callback receives event data: `{id, category, payload, status, start_time, end_time}`
 ---@return schedule.event_builder Self for method chaining
 function M:on_fail(callback)
+	assert(type(callback) == "function", "Event on_fail callback should be a function")
+
 	self.config.on_fail = callback
 	return self
 end
@@ -221,6 +302,14 @@ function M:abort_on_fail()
 end
 
 
+---Calendar cycle types compute their own first occurrence when no explicit start is set
+local CALENDAR_CYCLES = {
+	weekly = true,
+	monthly = true,
+	yearly = true,
+}
+
+
 ---Calculate start time from config
 ---@param config table Builder config
 ---@param current_time number Current time
@@ -229,14 +318,27 @@ end
 function M._calculate_start_time(config, current_time, existing_start_time)
 	if config.start_at then
 		return time.normalize_time(config.start_at)
-	elseif config.after then
+	end
+
+	-- A persisted start time always wins, otherwise re-declaring an event on game start
+	-- would push its timer forward on every launch
+	if existing_start_time then
+		return existing_start_time
+	end
+
+	if config.after then
 		if type(config.after) == "number" then
 			return current_time + config.after
 		end
-		return existing_start_time
-	else
-		return existing_start_time or current_time
+		return nil
 	end
+
+	-- Calendar cycles without an explicit start begin at their next occurrence
+	if config.cycle and CALENDAR_CYCLES[config.cycle.type] then
+		return cycles.calculate_next_cycle(config.cycle, current_time) or current_time
+	end
+
+	return current_time
 end
 
 
@@ -271,6 +373,36 @@ function M._determine_initial_status(config, current_time, start_time, end_time)
 end
 
 
+---Pick the configured value, falling back to the existing one.
+---Written as an explicit nil check so that `false` is a valid override.
+---@param config_value any Value from the builder config
+---@param existing_value any Value from the existing event state
+---@return any value
+local function merge_value(config_value, existing_value)
+	if config_value ~= nil then
+		return config_value
+	end
+	return existing_value
+end
+
+
+---Resolve the catch up flag. Events with a duration do not catch up by default,
+---events without one (plain timers) do.
+---@param config table Builder config
+---@param existing_state schedule.event.state|nil Existing state
+---@return boolean catch_up
+function M._resolve_catch_up(config, existing_state)
+	local catch_up = merge_value(config.catch_up, existing_state and existing_state.catch_up)
+	if catch_up ~= nil then
+		return catch_up
+	end
+
+	local has_duration = config.duration or config.end_at or
+		(existing_state and (existing_state.duration or existing_state.end_at))
+	return not has_duration
+end
+
+
 ---Build event state table from config
 ---@param config table Builder config
 ---@param event_id string Event ID
@@ -293,29 +425,48 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 		last_update_time = existing_state and existing_state.last_update_time or nil,
 		cycle_count = existing_state and (existing_state.cycle_count or 0) or 0,
 		next_cycle_time = existing_state and existing_state.next_cycle_time or nil,
-		category = config.category or (existing_state and existing_state.category or nil),
-		payload = config.payload or (existing_state and existing_state.payload or nil),
-		after = config.after or (existing_state and existing_state.after or nil),
-		after_options = config.after_options or (existing_state and existing_state.after_options or nil),
-		start_at = config.start_at or (existing_state and existing_state.start_at or nil),
-		end_at = config.end_at or (existing_state and existing_state.end_at or nil),
-		duration = config.duration or (existing_state and existing_state.duration or nil),
-		infinity = config.infinity ~= nil and config.infinity or (existing_state and existing_state.infinity or nil),
-		cycle = config.cycle or (existing_state and existing_state.cycle or nil),
-		conditions = config.conditions or (existing_state and existing_state.conditions or nil),
-		abort_on_fail = config.abort_on_fail ~= nil and config.abort_on_fail or (existing_state and existing_state.abort_on_fail or nil),
-		catch_up = config.catch_up ~= nil and config.catch_up or (existing_state and existing_state.catch_up or nil),
-		min_time = config.min_time or (existing_state and existing_state.min_time or nil)
+		category = merge_value(config.category, existing_state and existing_state.category),
+		payload = merge_value(config.payload, existing_state and existing_state.payload),
+		after = merge_value(config.after, existing_state and existing_state.after),
+		after_options = merge_value(config.after_options, existing_state and existing_state.after_options),
+		start_at = merge_value(config.start_at, existing_state and existing_state.start_at),
+		end_at = merge_value(config.end_at, existing_state and existing_state.end_at),
+		duration = merge_value(config.duration, existing_state and existing_state.duration),
+		infinity = merge_value(config.infinity, existing_state and existing_state.infinity),
+		cycle = merge_value(config.cycle, existing_state and existing_state.cycle),
+		conditions = merge_value(config.conditions, existing_state and existing_state.conditions),
+		abort_on_fail = merge_value(config.abort_on_fail, existing_state and existing_state.abort_on_fail),
+		catch_up = M._resolve_catch_up(config, existing_state),
+		min_time = merge_value(config.min_time, existing_state and existing_state.min_time)
 	}
+end
+
+
+---Check the configuration for combinations that cannot work
+---@param config table Builder config
+function M._validate_config(config)
+	assert(config.event_id == nil or type(config.event_id) == "string", "Event id should be a string")
+	assert(not (config.duration and config.end_at), "Event can not have both duration() and end_at(), pick one")
+	assert(not (config.infinity and (config.duration or config.end_at)),
+		"Event can not be infinity() and have duration() or end_at() at the same time")
+	assert(not (config.start_at and config.after), "Event can not have both start_at() and after(), pick one")
+
+	if config.end_at and config.start_at then
+		local start_time = time.normalize_time(config.start_at)
+		local end_time = time.normalize_time(config.end_at)
+		assert(start_time and end_time and end_time > start_time, "Event end_at should be after start_at")
+	end
 end
 
 
 ---Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 ---Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
 ---and callbacks are registered. If an existing event with the same ID exists, its state is merged.
----Returns the builder instance, which also acts as an event object with methods like `get_time_left()`, `get_status()`.
----@return schedule.event Event instance (builder also acts as event object)
+---Returns the created event object, with methods like `get_time_left()` and `get_status()`.
+---@return schedule.event event Created event instance
 function M:save()
+	M._validate_config(self.config)
+
 	local current_time = time.get_time()
 	local event_id = self.config.event_id or state.get_next_event_id()
 	local existing_state = event_id and state.get_event_state(event_id) or nil

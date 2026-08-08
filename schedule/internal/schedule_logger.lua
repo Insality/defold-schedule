@@ -17,16 +17,18 @@ local empty_logger = {
 	error = EMPTY_FUNCTION,
 }
 
+---Prints to the console. Not used by default, pass it to `schedule.set_logger()` to enable it
 ---@type schedule.logger
-local default_logger = {
-	trace = function(_, msg, data) print("TRACE: " .. msg, M.table_to_string(data)) end,
-	debug = function(_, msg, data) print("DEBUG: " .. msg, M.table_to_string(data)) end,
-	info = function(_, msg, data) print("INFO: " .. msg, M.table_to_string(data)) end,
-	warn = function(_, msg, data) print("WARN: " .. msg, M.table_to_string(data)) end,
-	error = function(_, msg, data) print("ERROR: " .. msg, M.table_to_string(data)) end
+M.default_logger = {
+	trace = function(_, msg, data) print("TRACE: " .. msg, (M.table_to_string(data))) end,
+	debug = function(_, msg, data) print("DEBUG: " .. msg, (M.table_to_string(data))) end,
+	info = function(_, msg, data) print("INFO: " .. msg, (M.table_to_string(data))) end,
+	warn = function(_, msg, data) print("WARN: " .. msg, (M.table_to_string(data))) end,
+	error = function(_, msg, data) print("ERROR: " .. msg, (M.table_to_string(data))) end
 }
 
-local METATABLE = { __index = default_logger }
+-- Logging is off until the game provides a logger, a library should stay quiet by default
+local METATABLE = { __index = empty_logger }
 
 function M.set_logger(logger)
 	METATABLE.__index = logger or empty_logger

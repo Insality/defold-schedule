@@ -2,6 +2,7 @@ local deftest = require("deftest.deftest")
 
 function init(self)
 	deftest.add(require("test.tests.test_schedule_basic"))
+	deftest.add(require("test.tests.test_schedule_api"))
 	deftest.add(require("test.tests.test_schedule_cycles_every"))
 	deftest.add(require("test.tests.test_schedule_cycles_weekly"))
 	deftest.add(require("test.tests.test_schedule_cycles_monthly"))

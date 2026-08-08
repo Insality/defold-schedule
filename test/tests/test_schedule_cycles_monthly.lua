@@ -2,83 +2,99 @@ return function()
 	describe("Schedule Cycles Monthly", function()
 		local schedule ---@type schedule
 		local schedule_time
+		local cycles
 		local time = 0
+
+		-- 2026-01-01T00:00:00 UTC
+		local JAN_1 = 1767225600
 
 		before(function()
 			schedule = require("schedule.schedule")
 			schedule_time = require("schedule.internal.schedule_time")
+			cycles = require("schedule.internal.schedule_cycles")
 
 			schedule.reset_state()
 			schedule_time.set_time_function(function() return time end)
 			time = 0
 		end)
 
-		it("Should cycle monthly on specified day", function()
+		---Format a timestamp as "YYYY-MM-DD HH:MM" for readable assertions
+		local function as_date(timestamp)
+			local year, month, day, hour, minute = schedule_time.timestamp_to_date(timestamp)
+			return string.format("%04d-%02d-%02d %02d:%02d", year, month, day, hour, minute)
+		end
+
+		it("Should calculate the next monthly occurrence", function()
+			local next_cycle = cycles.calculate_next_cycle({ type = "monthly", day = 15 }, JAN_1)
+
+			assert(as_date(next_cycle) == "2026-01-15 00:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should respect the time option", function()
+			local next_cycle = cycles.calculate_next_cycle({ type = "monthly", day = 15, time = "09:30" }, JAN_1)
+
+			assert(as_date(next_cycle) == "2026-01-15 09:30", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should roll to the next month when the day has passed", function()
+			-- 2026-01-20, targeting day 15
+			local next_cycle = cycles.calculate_next_cycle(
+				{ type = "monthly", day = 15, time = "09:30" }, JAN_1 + 19 * 86400)
+
+			assert(as_date(next_cycle) == "2026-02-15 09:30", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should return the same day when the target time is still ahead", function()
+			-- 2026-01-15 08:00, targeting 09:30 the same day
+			local next_cycle = cycles.calculate_next_cycle(
+				{ type = "monthly", day = 15, time = "09:30" }, JAN_1 + 14 * 86400 + 8 * 3600)
+
+			assert(as_date(next_cycle) == "2026-01-15 09:30", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should clamp day 31 to the last day of a short month", function()
+			-- February 2026 has 28 days
+			local next_cycle = cycles.calculate_next_cycle(
+				{ type = "monthly", day = 31 }, JAN_1 + 31 * 86400)
+
+			assert(as_date(next_cycle) == "2026-02-28 00:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should default to the first day of the month", function()
+			local next_cycle = cycles.calculate_next_cycle({ type = "monthly" }, JAN_1 + 5 * 86400)
+
+			assert(as_date(next_cycle) == "2026-02-01 00:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should cycle a monthly event through update", function()
+			time = JAN_1
 			local event = schedule.event()
-				:category("monthly_event")
-				:cycle("monthly", { day = 1, time = "00:00", skip_missed = true })
+				:category("reward")
+				:cycle("monthly", { day = 15, time = "00:00" })
 				:duration(86400)
 				:save()
 
-			assert(event ~= nil, "Status should exist")
-		end)
+			schedule.update()
+			assert(event:get_status() == "pending", "Should wait for the 15th")
 
+			time = JAN_1 + 14 * 86400
+			schedule.update()
+			assert(event:get_status() == "active", "Should activate on the 15th")
 
-		it("Should cycle monthly with specific time", function()
-			local event = schedule.event()
-				:category("monthly_event")
-				:cycle("monthly", { day = 15, time = "12:00", skip_missed = true })
-				:duration(3600)
-				:save()
+			time = time + 86400
+			schedule.update()
+			assert(event:get_status() == "completed", "Should complete after the duration")
 
-			assert(event ~= nil, "Status should exist")
-		end)
-
-
-		it("Should handle day 31 edge case", function()
-			local event = schedule.event()
-				:category("monthly_event")
-				:cycle("monthly", { day = 31, time = "00:00", skip_missed = true })
-				:duration(86400)
-				:save()
-
-			assert(event ~= nil, "Status should exist")
-		end)
-
-
-		it("Should handle leap year February 29", function()
-			local event = schedule.event()
-				:category("monthly_event")
-				:cycle("monthly", { day = 29, time = "00:00", skip_missed = true })
-				:duration(86400)
-				:save()
-
-			assert(event ~= nil, "Status should exist")
-		end)
-
-
-		it("Should skip missed monthly cycles when skip_missed is true", function()
-			local event = schedule.event()
-				:category("monthly_event")
-				:cycle("monthly", { day = 1, time = "00:00", skip_missed = true })
-				:duration(86400)
-				:save()
-
-			assert(event ~= nil, "Status should exist")
-		end)
-
-
-		it("Should handle different month lengths", function()
-			for day = 1, 28 do
-				local event = schedule.event()
-					:category("monthly_event")
-					:cycle("monthly", { day = day, time = "00:00", skip_missed = true })
-					:duration(86400)
-					:save()
-
-				assert(event ~= nil, "Status should exist for day " .. day)
-			end
+			-- February 15th
+			time = JAN_1 + 45 * 86400
+			schedule.update()
+			assert(event:get_status() == "active", "Should activate again next month")
 		end)
 	end)
 end
-

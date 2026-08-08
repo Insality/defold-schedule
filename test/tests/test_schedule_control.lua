@@ -307,7 +307,6 @@ return function()
 
 		it("Should not extend duration for events with hardcoded end_at", function()
 			local event = schedule.event()
-				:duration(100)
 				:end_at(200)  -- Hardcoded end time
 				:save()
 

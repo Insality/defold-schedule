@@ -74,6 +74,18 @@ function M:get_time_left()
 		return math.max(0, self.state.end_time - current_time)
 	end
 
+	if status == "paused" then
+		if self.state.infinity then
+			return -1
+		end
+		if not self.state.end_time then
+			return 0
+		end
+		-- A paused event does not consume its remaining time
+		local paused_at = self.state.last_update_time or current_time
+		return math.max(0, self.state.end_time - paused_at)
+	end
+
 	return 0
 end
 
@@ -124,7 +136,10 @@ function M:get_progress()
 		if duration <= 0 then
 			return 1
 		end
-		local elapsed = current_time - self.state.start_time
+
+		-- A paused event is frozen at the moment it was paused
+		local elapsed_until = status == "paused" and (self.state.last_update_time or current_time) or current_time
+		local elapsed = elapsed_until - self.state.start_time
 		return math.max(0, math.min(1, elapsed / duration))
 	end
 
@@ -153,6 +168,27 @@ function M:get_start_time()
 end
 
 
+---Get event end time
+---@return number|nil end_time Event end time in seconds, or nil for infinity events and events that have no end yet
+function M:get_end_time()
+	return self.state.end_time
+end
+
+
+---Get how many times the event has been activated by its cycle
+---@return number cycle_count Number of completed cycle activations, 0 for the first run
+function M:get_cycle_count()
+	return self.state.cycle_count or 0
+end
+
+
+---Check if the event is currently active
+---@return boolean is_active True if the event status is "active"
+function M:is_active()
+	return self:get_status() == "active"
+end
+
+
 ---Force finish this event. Sets status to "completed" and triggers lifecycle callbacks.
 ---Works on active, pending, paused, or any other status. If event is pending, it will be started first.
 ---@return boolean success True if event was finished
@@ -167,14 +203,16 @@ function M:finish()
 		return false
 	end
 	local current_time = time.get_time()
-	local event_data = { event_id = event_id, category = event_state.category, payload = event_state.payload }
 
-	if event_state.status == "pending" or event_state.status == "cancelled" or event_state.status == "aborted" or event_state.status == "failed" or event_state.status == "paused" then
+	if event_state.status ~= "active" then
 		if not event_state.start_time then
 			event_state.start_time = current_time
 		end
-		lifecycle.on_start(event_id, event_data)
-		lifecycle.on_enabled(event_id, event_data)
+		event_state.status = "active"
+
+		local start_event_data = processor._create_event_data(event_id, event_state)
+		lifecycle.on_start(event_id, start_event_data)
+		lifecycle.on_enabled(event_id, start_event_data)
 	end
 
 	event_state.status = "completed"
@@ -183,6 +221,7 @@ function M:finish()
 	event_state.end_time = event_state.end_time or current_time
 	self.state = event_state
 
+	local event_data = processor._create_event_data(event_id, event_state)
 	lifecycle.on_end(event_id, event_data)
 	lifecycle.on_disabled(event_id, event_data)
 
@@ -224,7 +263,7 @@ function M:start()
 
 	self.state = event_state
 
-	local event_data = { event_id = event_id, category = event_state.category, payload = event_state.payload }
+	local event_data = processor._create_event_data(event_id, event_state)
 	lifecycle.on_start(event_id, event_data)
 	lifecycle.on_enabled(event_id, event_data)
 
@@ -233,7 +272,8 @@ end
 
 
 ---Cancel this event. Sets status to "cancelled".
----Works on any status except "completed".
+---Works on any status except "completed". A cancelled event is terminal: the update loop
+---will not revive it, use `start()` to run it again.
 ---@return boolean success True if event was cancelled
 function M:cancel()
 	local event_id = self.state.event_id
@@ -250,9 +290,15 @@ function M:cancel()
 		return false
 	end
 
+	local was_active = event_state.status == "active"
 	event_state.status = "cancelled"
 	event_state.last_update_time = time.get_time()
 	self.state = event_state
+
+	-- An active event was visible to the game, so it has to be switched off as well
+	if was_active then
+		lifecycle.on_disabled(event_id, processor._create_event_data(event_id, event_state))
+	end
 
 	return true
 end
@@ -280,15 +326,7 @@ function M:pause()
 	event_state.last_update_time = time.get_time()
 	self.state = event_state
 
-	local event_data = {
-		event_id = event_id,
-		category = event_state.category,
-		payload = event_state.payload,
-		status = "paused",
-		start_time = event_state.start_time,
-		end_time = event_state.end_time
-	}
-	lifecycle.on_disabled(event_id, event_data)
+	lifecycle.on_disabled(event_id, processor._create_event_data(event_id, event_state))
 
 	return true
 end
@@ -331,15 +369,7 @@ function M:resume()
 	event_state.last_update_time = current_time
 	self.state = event_state
 
-	local event_data = {
-		event_id = event_id,
-		category = event_state.category,
-		payload = event_state.payload,
-		status = "active",
-		start_time = event_state.start_time,
-		end_time = event_state.end_time
-	}
-	lifecycle.on_enabled(event_id, event_data)
+	lifecycle.on_enabled(event_id, processor._create_event_data(event_id, event_state))
 
 	return true
 end

@@ -37,6 +37,11 @@ local craft_2 = schedule.event()
 
 ## Handle Events
 
+The `callback_type` is one of `"start"`, `"enabled"`, `"disabled"`, `"end"` or `"fail"`.
+
+Return `true` from a subscriber to mark the event as handled and remove it from the queue.
+Return `nil` to leave it for other subscribers. Note that `return false` also counts as handled.
+
 ```lua
 local schedule = require("schedule.schedule")
 
@@ -47,11 +52,11 @@ schedule.event()
 	:save()
 
 schedule.on_event:subscribe(function(event)
-	if event.category ~= "craft" or event.callback_type ~= "active" then
-		return false
+	if event.category ~= "craft" or event.callback_type ~= "end" then
+		return nil -- Not ours, leave it in the queue
 	end
 
-	-- Handle event
+	give_item(event.payload.item_id, event.payload.quantity)
 	return true
 end)
 ```
@@ -89,7 +94,7 @@ schedule.event()
 ```
 
 
-## OFfers With Conditions
+## Offers With Conditions
 
 ```lua
 local schedule = require("schedule.schedule")
@@ -114,19 +119,27 @@ schedule.event()
 ```lua
 local schedule = require("schedule.schedule")
 
---- Daily rewards, trigger each day once, after 6:00 AM
-schedule.event()
+--- Daily rewards, trigger each day once, starting 6 hours from now
+--- catch_up(true) makes the player receive the rewards missed while offline,
+--- skip_missed = true would grant only the most recent one instead
+schedule.event("daily_reward")
 	:category("daily_reward")
-	:cycle("every", { seconds = schedule.DAY, anchor = "start", skip_missed = true })
+	:cycle("every", { seconds = schedule.DAY, anchor = "start" })
 	:after(6 * schedule.HOUR) -- Start 6 hours from now (first occurrence)
 	:duration(1) -- Instant reward
+	:catch_up(true)
+	:on_end(function(event_data)
+		give_daily_reward()
+	end)
 	:save()
 ```
 
 
 ## Weekly Events
 
-Weekly cycles automatically calculate the next occurrence from the current time when `start_at` is not provided. This makes it easy to schedule recurring weekly events without specifying an exact start date.
+Weekly, monthly and yearly cycles automatically calculate the next occurrence from the current time when `start_at` is not provided. This makes it easy to schedule recurring events without specifying an exact start date.
+
+All calendar times are UTC: `time = "14:00"` means 14:00 UTC, not the player's local time.
 
 ### Every Sunday (No start_at needed)
 
@@ -226,4 +239,72 @@ local event = schedule.event("event_first_week")
 	:save()
 
 local event_id = event:get_id()
+```
+
+
+## Save and Restore
+
+```lua
+local saver = require("saver.saver")
+local schedule = require("schedule.schedule")
+
+function init(self)
+	saver.init()
+	saver.bind_save_state("schedule", schedule.get_state())
+
+	-- Declare events after the state is restored. Timings are kept, callbacks are re-attached
+	declare_game_events()
+
+	timer.delay(1, true, function()
+		schedule.update()
+	end)
+end
+```
+
+
+## Clean Up Finished Events
+
+Completed events stay in the state until they are removed.
+
+```lua
+local schedule = require("schedule.schedule")
+
+-- Drop a single event
+schedule.remove("craft_sword")
+
+-- Drop every finished craft, for example before saving
+schedule.clear("craft", "completed")
+```
+
+
+## Use Server Time
+
+The device clock can be changed by the player. Drive the schedule from your server time
+to make LiveOps events and offers tamper resistant.
+
+```lua
+local schedule = require("schedule.schedule")
+
+schedule.set_time_function(function()
+	return backend.get_server_time() -- Unix seconds
+end)
+```
+
+
+## Show a Craft Timer
+
+```lua
+local schedule = require("schedule.schedule")
+
+local function update_craft_ui(self)
+	local craft = schedule.get("craft_sword")
+	if not craft then
+		return
+	end
+
+	if craft:is_active() then
+		self.progress:set_to(craft:get_progress())
+		self.timer_text:set_text(format_time(craft:get_time_left()))
+	end
+end
 ```

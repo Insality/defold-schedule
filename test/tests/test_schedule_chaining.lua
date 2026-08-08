@@ -91,7 +91,8 @@ return function()
 			time = 500
 			schedule.update()
 			assert(craft_1:get_status() == "completed")
-			assert(craft_2:get_status() == "active", "Second event should start after first completes")
+			-- Both windows are over by now, the chained craft ran from 180 to 300 while offline
+			assert(craft_2:get_status() == "completed", "Second event should be finished after the offline period")
 			assert(craft_2:get_start_time() == 180, "Second event should start at first event end time")
 		end)
 
@@ -116,7 +117,7 @@ return function()
 			time = 500
 			schedule.update()
 			assert(craft_1:get_status() == "completed")
-			assert(craft_2:get_status() == "active", "Second event should start after update")
+			assert(craft_2:get_status() == "completed", "Second event should run through the offline period")
 			assert(craft_2:get_start_time() == 180, "Second event should start at first event end time")
 		end)
 
@@ -146,6 +147,53 @@ return function()
 			time = 240
 			schedule.update()
 			assert(craft_2:get_status() == "completed")
+		end)
+
+
+		it("Should not spend the offline gap on the chained event with wait_online", function()
+			local craft_1 = schedule.event()
+				:category("craft")
+				:duration(3600)
+				:save()
+
+			local craft_2 = schedule.event()
+				:category("craft")
+				:after(craft_1:get_id(), { wait_online = true })
+				:duration(3600)
+				:save()
+
+			schedule.update()
+			assert(craft_1:get_status() == "active", "First craft should be active")
+
+			-- Player is away for five hours, the first craft needed one
+			time = 5 * 3600
+			schedule.update()
+			assert(craft_1:get_status() == "completed", "First craft should be completed")
+			assert(craft_2:get_status() == "active", "Second craft should start when the player is back")
+			assert(craft_2:get_start_time() == 5 * 3600, "Second craft should start now, not when the first ended")
+			assert(craft_2:get_time_left() == 3600, "Second craft should still need a full hour, got " .. craft_2:get_time_left())
+		end)
+
+
+		it("Should spend the offline gap on the chained event without wait_online", function()
+			local craft_1 = schedule.event()
+				:category("craft")
+				:duration(3600)
+				:save()
+
+			local craft_2 = schedule.event()
+				:category("craft")
+				:after(craft_1:get_id())
+				:duration(3600)
+				:save()
+
+			schedule.update()
+
+			time = 5 * 3600
+			schedule.update()
+			assert(craft_1:get_status() == "completed", "First craft should be completed")
+			assert(craft_2:get_start_time() == 3600, "Second craft should start when the first ended")
+			assert(craft_2:get_time_left() == 0, "Second craft should already be done, got " .. craft_2:get_time_left())
 		end)
 
 

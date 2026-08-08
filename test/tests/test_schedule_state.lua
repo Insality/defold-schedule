@@ -40,6 +40,73 @@ return function()
 		end)
 
 
+		it("Should keep the start time when an event is re-declared on game start", function()
+			schedule.event("craft_sword")
+				:category("craft")
+				:after(3600)
+				:duration(120)
+				:save()
+
+			local state = deep_copy_state(schedule.get_state())
+			assert(schedule.get_status("craft_sword").start_time == 3600, "Should start an hour from now")
+
+			-- Game restart: state is restored and the event is declared again by game code
+			time = 1800
+			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
+			schedule.set_state(state)
+			schedule.event("craft_sword")
+				:category("craft")
+				:after(3600)
+				:duration(120)
+				:save()
+
+			assert(schedule.get_status("craft_sword").start_time == 3600,
+				"Re-declaring should not push the timer forward, got " .. tostring(schedule.get_status("craft_sword").start_time))
+
+			time = 3600
+			schedule.update()
+			assert(schedule.get("craft_sword"):get_status() == "active", "Should still activate on the original schedule")
+		end)
+
+
+		it("Should restore callbacks when an event is re-declared", function()
+			local started = 0
+			schedule.event("craft_sword")
+				:after(60)
+				:duration(10)
+				:save()
+
+			local state = deep_copy_state(schedule.get_state())
+
+			-- Game restart: callbacks live in memory only, so they are lost until re-declared
+			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
+			schedule.set_state(state)
+			schedule.event("craft_sword")
+				:after(60)
+				:duration(10)
+				:on_start(function() started = started + 1 end)
+				:save()
+
+			time = 60
+			schedule.update()
+			assert(started == 1, "Re-declared callback should fire")
+		end)
+
+
+		it("Should accept a state table without internal counters", function()
+			schedule.set_state({ events = {} })
+
+			local event = schedule.event():duration(10):save()
+			assert(event:get_id() ~= nil, "Should generate an id after restoring a partial state")
+
+			schedule.set_state(nil)
+			local another_event = schedule.event():duration(10):save()
+			assert(another_event:get_id() ~= nil, "Should generate an id after restoring a nil state")
+		end)
+
+
 		it("Should reset state", function()
 			local event = schedule.event()
 				:category("craft")
@@ -260,7 +327,8 @@ return function()
 			schedule.update()
 			assert(event:get_status() == "completed", "Event should be completed")
 
-			time = 30
+			-- Second cycle runs from 20 to 30
+			time = 25
 			schedule.update()
 			assert(event:get_status() == "active", "Event should be active again after cycle")
 

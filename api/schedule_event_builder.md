@@ -4,11 +4,6 @@
 
 ## Functions
 
-- [create](#create)
-- [_calculate_start_time](#_calculate_start_time)
-- [_calculate_end_time](#_calculate_end_time)
-- [_determine_initial_status](#_determine_initial_status)
-- [_build_event_state](#_build_event_state)
 - [category](#category)
 - [after](#after)
 - [start_at](#start_at)
@@ -32,91 +27,6 @@
 - [config](#config)
 
 
-
-### create
-
----
-```lua
-event_builder.create([event_id])
-```
-
-Create a new event builder instance (internal - use schedule.event() instead).
-
-- **Parameters:**
-	- `[event_id]` *(string|nil)*: Unique identifier for the event for persistence, or nil to generate a random one
-
-- **Returns:**
-	- `New` *(schedule.event_builder)*: builder instance
-
-### _calculate_start_time
-
----
-```lua
-event_builder._calculate_start_time(config, current_time, [existing_start_time])
-```
-
-Calculate start time from config
-
-- **Parameters:**
-	- `config` *(table)*: Builder config
-	- `current_time` *(number)*: Current time
-	- `[existing_start_time]` *(number|nil)*: Existing start time to preserve (nil for new events)
-
-- **Returns:**
-	- `calculated_start_time` *(number|nil)*:
-
-### _calculate_end_time
-
----
-```lua
-event_builder._calculate_end_time(config, [start_time], [existing_end_time])
-```
-
-Calculate end time from config
-
-- **Parameters:**
-	- `config` *(table)*: Builder config
-	- `[start_time]` *(number|nil)*: Calculated start time
-	- `[existing_end_time]` *(number|nil)*: Existing end time to preserve (nil for new events)
-
-- **Returns:**
-	- `calculated_end_time` *(number|nil)*:
-
-### _determine_initial_status
-
----
-```lua
-event_builder._determine_initial_status(config, current_time, [start_time], [end_time])
-```
-
-Determine initial status for new event
-
-- **Parameters:**
-	- `config` *(table)*: Builder config
-	- `current_time` *(number)*: Current time
-	- `[start_time]` *(number|nil)*: Calculated start time
-	- `[end_time]` *(number|nil)*: Calculated end time
-
-- **Returns:**
-	- `initial_status` *(string)*: pending
-
-### _build_event_state
-
----
-```lua
-event_builder._build_event_state(config, event_id, current_time, [existing_state])
-```
-
-Build event state table from config
-
-- **Parameters:**
-	- `config` *(table)*: Builder config
-	- `event_id` *(string)*: Event ID
-	- `current_time` *(number)*: Current time
-	- `[existing_state]` *(schedule.event.state|nil)*: Existing state (nil for new events)
-
-- **Returns:**
-	- `event_state` *(schedule.event.state)*:
 
 ### category
 
@@ -143,7 +53,9 @@ event_builder:after(after, [options])
 
 Set event to start after a relative delay or after another event completes (event chaining).
 Use for relative timing or sequential events. Use `start_at()` for absolute calendar-based timing.
-Set `wait_online = true` in options to wait for first update() call after parent completes (starts counting after player is online, don't include offline time); if false/nil, starts immediately when parent completes.
+Set `wait_online = true` in options to start counting when the player is back online, so an offline gap
+between the two events is not spent by this one. Without it the event starts right when the parent ended,
+which means it can already be finished when the player returns.
 
 - **Parameters:**
 	- `after` *(string|number|schedule.event)*: Seconds to wait (number) or event ID to chain after (string)
@@ -281,7 +193,7 @@ event_builder:catch_up(catch_up)
 
 Set whether the event should catch up on missed time when the game resumes after being offline.
 Enable for offline progression (crafting, daily rewards). Disable for LiveOps or time-sensitive events.
-Events with duration default to `false`; events without duration default to `true`.
+Events with a duration (or an `end_at`) default to `false`, events without one default to `true`.
 
 - **Parameters:**
 	- `catch_up` *(boolean)*: true to enable offline catch-up, false to disable
@@ -407,10 +319,10 @@ event_builder:save()
 Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
 and callbacks are registered. If an existing event with the same ID exists, its state is merged.
-Returns the builder instance, which also acts as an event object with methods like `get_time_left()`, `get_status()`.
+Returns the created event object, with methods like `get_time_left()` and `get_status()`.
 
 - **Returns:**
-	- `Event` *(schedule.event)*: instance (builder also acts as event object)
+	- `event` *(schedule.event)*: Created event instance
 
 
 ## Fields
