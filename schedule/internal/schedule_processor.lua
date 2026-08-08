@@ -298,6 +298,15 @@ function M._collect_finished_cycles(event_state, from_time, current_time, budget
 		cycle_start = M._following_cycle(event_state, cycle_start)
 	end
 
+	-- Hitting the step limit means the rest of the missed occurrences are dropped and the event
+	-- jumps to the current one. Set max_catches to make that a deliberate number
+	if #finished_cycles >= MAX_CYCLE_STEPS and cycle_start and cycle_start <= current_time then
+		logger:warn("Catch-up stopped at the step limit, remaining missed cycles are skipped", {
+			collected = #finished_cycles,
+			limit = MAX_CYCLE_STEPS
+		})
+	end
+
 	return finished_cycles, cycle_start
 end
 

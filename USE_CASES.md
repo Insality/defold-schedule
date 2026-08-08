@@ -216,15 +216,14 @@ end
 
 ### Daily rewards
 
-One reward per day, starting six hours from now. With `catch_up(true)` every day the player missed
-is granted on return, with `skip_missed = true` only the most recent one is.
+One reward per day, starting six hours from now.
 
 ```lua
 local schedule = require("schedule.schedule")
 
 schedule.event("daily_reward")
 	:category("daily_reward")
-	:cycle("every", { seconds = schedule.DAY })
+	:cycle("every", { seconds = schedule.DAY, max_catches = 7 }) -- At most a week of catch-up
 	:after(6 * schedule.HOUR)
 	:duration(1) -- Instant reward
 	:catch_up(true)
@@ -233,6 +232,22 @@ schedule.event("daily_reward")
 	end)
 	:save()
 ```
+
+**Decide what happens to the days the player missed.** All missed occurrences are replayed in the
+same `update()`, one `on_end` per day, so a player returning after two months would get all of them
+at once. Pick the option that matches your design:
+
+| Setup                                       | Player returns after 60 days |
+| ------------------------------------------- | ---------------------------- |
+| `catch_up(true)`                             | 60 rewards, 60 callbacks in one update |
+| `catch_up(true)` + `max_catches = 7`         | 7 rewards                    |
+| `catch_up(true)` + `skip_missed = true`      | 1 reward                     |
+| `catch_up(false)`                            | 1 reward                     |
+
+Two practical notes: the callbacks run synchronously, so grant resources there and show one summary
+popup afterwards instead of one popup per reward. And keep `max_catches` on frequent cycles - the
+catch-up walks at most 512 occurrences per update, past that the rest are dropped with a warning in
+the log.
 
 
 ### Weekend event
