@@ -183,6 +183,45 @@ return function()
 		end)
 
 
+		it("Should apply conditions to an event created with end_at", function()
+			schedule.register_condition("never", function() return false end)
+
+			local event = schedule.event("sale")
+				:end_at(1000)
+				:condition("never", {})
+				:save()
+
+			assert(event:get_status() == "pending", "A new event should be pending before the first update")
+
+			schedule.update()
+			assert(event:get_status() == "pending", "A failing condition should keep the event from starting")
+		end)
+
+
+		it("Should apply min_time to an event created with end_at", function()
+			local event = schedule.event("sale")
+				:end_at(1000)
+				:min_time(5000)
+				:save()
+
+			schedule.update()
+			assert(event:get_status() == "cancelled", "Should not start with less than min_time left")
+		end)
+
+
+		it("Should report the start of an event created with end_at", function()
+			local started = 0
+			local event = schedule.event("sale")
+				:end_at(1000)
+				:on_start(function() started = started + 1 end)
+				:save()
+
+			schedule.update()
+			assert(event:get_status() == "active", "Should be active inside its window")
+			assert(started == 1, "on_start should be called once, got " .. started)
+		end)
+
+
 		it("Should keep the queue bounded without subscribers", function()
 			local lifecycle = require("schedule.internal.schedule_lifecycle")
 

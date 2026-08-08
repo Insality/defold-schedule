@@ -213,7 +213,11 @@ Completed one-shot events stay in the state until you remove them. Drop the ones
 
 ## Use Cases
 
-Read the [Use Cases](USE_CASES.md) file to see several examples of how to use the Event module in your Defold game development projects.
+Read the [Use Cases](USE_CASES.md) file for worked examples: crafting timers and building queues,
+cooldowns, energy regeneration, LiveOps windows, daily rewards, offers with conditions and event chaining.
+
+It starts with the two ways to use the schedule - **pull** (keep the event id and query it) and
+**push** (attach callbacks and let the schedule call you) - and when to pick which.
 
 
 ## License

@@ -357,21 +357,6 @@ function M._calculate_end_time(config, start_time, existing_end_time)
 end
 
 
----Determine initial status for new event
----@param config table Builder config
----@param current_time number Current time
----@param start_time number|nil Calculated start time
----@param end_time number|nil Calculated end time
----@return string initial_status "pending" or "active"
-function M._determine_initial_status(config, current_time, start_time, end_time)
-	if config.end_at and not config.start_at and not config.after then
-		if start_time and current_time >= start_time and end_time and current_time < end_time then
-			return "active"
-		end
-	end
-	return "pending"
-end
-
 
 ---Pick the configured value, falling back to the existing one.
 ---Written as an explicit nil check so that `false` is a valid override.
@@ -414,8 +399,9 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 	local end_time = existing_state and existing_state.end_time or nil
 	local calculated_start_time = M._calculate_start_time(config, current_time, start_time)
 	local calculated_end_time = M._calculate_end_time(config, calculated_start_time, end_time)
-	local initial_status = existing_state and (existing_state.status or "pending")
-		or M._determine_initial_status(config, current_time, calculated_start_time, calculated_end_time)
+	-- A new event always starts pending. The first update() activates it, so conditions,
+	-- min_time and the start callbacks are applied the same way for every event
+	local initial_status = existing_state and (existing_state.status or "pending") or "pending"
 
 	return {
 		event_id = event_id,
