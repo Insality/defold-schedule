@@ -127,15 +127,6 @@ function M.get_event_state(event_id)
 end
 
 
----Get the raw event state table by ID.
----@deprecated Use `get_event_state()` instead, `get_status()` is easy to confuse with `event:get_status()`
----@param event_id string The event ID to query
----@return schedule.event.state|nil event_state Raw event state table, or nil if event doesn't exist
-function M.get_status(event_id)
-	return state.get_event_state(event_id)
-end
-
-
 ---Remove an event completely, dropping its state and its lifecycle callbacks.
 ---Completed events stay in the state until removed, so clean up one-shot events you no longer need
 ---to keep the save file small.

@@ -10,7 +10,6 @@
 - [event](#event)
 - [get](#get)
 - [get_event_state](#get_event_state)
-- [get_status](#get_status)
 - [remove](#remove)
 - [clear](#clear)
 - [set_time_function](#set_time_function)
@@ -112,23 +111,6 @@ schedule.get_event_state(event_id)
 Get the raw event state table by ID. Use for direct state access.
 The returned table is the live internal state, changing it changes the event.
 Prefer `get()` unless you specifically need raw state access.
-
-- **Parameters:**
-	- `event_id` *(string)*: The event ID to query
-
-- **Returns:**
-	- `event_state` *(schedule.event.state|nil)*: Raw event state table, or nil if event doesn't exist
-
-### get_status
-
----
-```lua
-schedule.get_status(event_id)
-```
-
-> **Deprecated:** Use `get_event_state()` instead, `get_status()` is easy to confuse with `event:get_status()`
-
-Get the raw event state table by ID.
 
 - **Parameters:**
 	- `event_id` *(string)*: The event ID to query

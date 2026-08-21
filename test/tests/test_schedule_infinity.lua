@@ -97,7 +97,7 @@ return function()
 
 			local event_id = event:get_id()
 			if event_id then
-				local status = schedule.get_status(event_id)
+				local status = schedule.get_event_state(event_id)
 				assert(status ~= nil, "Status should exist")
 				if status then
 					assert(status.cycle_count == 0, "Cycle count should be 0 for infinity events without end")
@@ -131,7 +131,7 @@ return function()
 			if restored_event then
 				assert(restored_event:get_status() == "active", "Event should be active after restore")
 			end
-			local status = schedule.get_status("infinity_test")
+			local status = schedule.get_event_state("infinity_test")
 			assert(status ~= nil, "Status should exist")
 			if status then
 				assert(status.infinity == true, "Infinity flag should be preserved")

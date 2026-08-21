@@ -193,7 +193,7 @@ return function()
 
 			time = 60
 			schedule.update()
-			local status1 = schedule.get_status(event:get_id())
+			local status1 = schedule.get_event_state(event:get_id())
 			assert(status1 ~= nil, "Status should exist")
 			assert(status1.cycle_count == 0 or status1.cycle_count == nil, "Initial cycle_count should be 0 or nil")
 
@@ -203,7 +203,7 @@ return function()
 
 			time = 160
 			schedule.update()
-			local status2 = schedule.get_status(event:get_id())
+			local status2 = schedule.get_event_state(event:get_id())
 			assert(status2 ~= nil, "Status should exist")
 			assert(status2.cycle_count == 1, "cycle_count should increment to 1 after second cycle")
 
@@ -213,7 +213,7 @@ return function()
 
 			time = 260
 			schedule.update()
-			local status3 = schedule.get_status(event:get_id())
+			local status3 = schedule.get_event_state(event:get_id())
 			assert(status3 ~= nil, "Status should exist")
 			assert(status3.cycle_count == 2, "cycle_count should increment to 2 after third cycle")
 		end)
