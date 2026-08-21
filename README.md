@@ -50,10 +50,10 @@ Open your `game.project` file and add the following line to the dependencies fie
 https://github.com/Insality/defold-event/archive/refs/tags/20.zip
 ```
 
-**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/1.zip)**
+**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/2.zip)**
 
 ```
-https://github.com/Insality/defold-schedule/archive/refs/tags/1.zip
+https://github.com/Insality/defold-schedule/archive/refs/tags/2.zip
 ```
 
 
