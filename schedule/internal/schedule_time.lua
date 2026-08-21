@@ -174,7 +174,10 @@ function M.parse_time_string(time_string)
 		return nil, nil, nil
 	end
 
-	local hour, minute, second = time_string:match("^(%d%d):(%d%d):?(%d%d)?$")
+	local hour, minute, second = time_string:match("^(%d%d):(%d%d):(%d%d)$")
+	if not hour then
+		hour, minute = time_string:match("^(%d%d):(%d%d)$")
+	end
 	if not hour then
 		return nil, nil, nil
 	end

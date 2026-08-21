@@ -41,7 +41,8 @@ return function()
 			schedule.update()
 			assert(child:get_status() == "completed", "Child should complete")
 
-			time = 190
+			-- Second parent cycle runs from 160 to 190
+			time = 170
 			schedule.update()
 			assert(parent:get_status() == "active", "Parent should reactivate for second cycle")
 			assert(child:get_start_time() == nil, "Child start_time should be reset when parent reactivates")

@@ -1,5 +1,5 @@
 [bootstrap]
-main_collection = /example/example.collectionc
+main_collection = /test/test.collectionc
 
 [script]
 shared_state = 1
@@ -19,13 +19,16 @@ scale = 0.01
 [html5]
 scale_mode = stretch
 
+[library]
+include_dirs = schedule
+
 [project]
 title = Defold Schedule
-version = 1
+version = 2
 publisher = Insality
 developer = Insality
 dependencies#0 = https://github.com/Insality/asset-store/archive/refs/heads/main.zip
-dependencies#1 = https://github.com/Insality/defold-event/archive/refs/tags/13.zip
+dependencies#1 = https://github.com/Insality/defold-event/archive/refs/tags/20.zip
 dependencies#2 = https://github.com/britzl/deftest/archive/refs/tags/2.8.0.zip
 dependencies#3 = https://github.com/Insality/druid/archive/heads/develop.zip
 dependencies#4 = https://github.com/Insality/defold-saver/archive/refs/tags/5.zip

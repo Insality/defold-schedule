@@ -25,14 +25,10 @@ function M.calculate_next_every(cycle_config, current_time, last_cycle_time, anc
 
 	local next_time = base_time + cycle_config.seconds
 
-	if cycle_config.skip_missed then
-		while next_time < current_time do
-			next_time = next_time + cycle_config.seconds
-		end
-	else
-		if next_time < current_time then
-			next_time = current_time + cycle_config.seconds
-		end
+	-- Keep occurrences aligned to the anchor instead of drifting away from it after a long gap
+	if next_time < current_time then
+		local missed_intervals = math.ceil((current_time - next_time) / cycle_config.seconds)
+		next_time = next_time + missed_intervals * cycle_config.seconds
 	end
 
 	return next_time
@@ -154,21 +150,22 @@ function M.calculate_next_yearly(cycle_config, current_time, anchor_time)
 		target_second = 0
 	end
 
-	local current_year, current_month, current_day = time.timestamp_to_date(current_time)
+	local current_year = time.timestamp_to_date(current_time)
 
-	local candidate_year = current_year
-	if current_month > target_month or (current_month == target_month and current_day >= target_day) then
-		candidate_year = current_year + 1
+	-- Try the current year first, so an occurrence later today is not skipped to the next year
+	for _, candidate_year in ipairs({ current_year, current_year + 1 }) do
+		local days_in_target_month = time.get_days_in_month(candidate_year, target_month)
+		local final_day = math.min(target_day, days_in_target_month)
+
+		local candidate_time = time.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
+			candidate_year, target_month, final_day, target_hour, target_minute, target_second))
+
+		if candidate_time and candidate_time >= current_time then
+			return candidate_time
+		end
 	end
 
-	local days_in_target_month = time.get_days_in_month(candidate_year, target_month)
-	local final_day = target_day
-	if final_day > days_in_target_month then
-		final_day = days_in_target_month
-	end
-
-	return time.parse_iso_date(string.format("%04d-%02d-%02dT%02d:%02d:%02d",
-		candidate_year, target_month, final_day, target_hour, target_minute, target_second))
+	return nil
 end
 
 

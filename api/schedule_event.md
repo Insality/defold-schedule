@@ -14,6 +14,9 @@
 - [get_payload](#get_payload)
 - [get_category](#get_category)
 - [get_start_time](#get_start_time)
+- [get_end_time](#get_end_time)
+- [get_cycle_count](#get_cycle_count)
+- [is_active](#is_active)
 - [finish](#finish)
 - [start](#start)
 - [cancel](#cancel)
@@ -86,7 +89,7 @@ Get event status
 event:get_time_left()
 ```
 
-Get time left until event ends
+Get time left until event ends. A paused event keeps the time it had when it was paused.
 
 - **Returns:**
 	- `time_left` *(number)*: Returns -1 for infinity events, 0 for completed events, or remaining seconds
@@ -151,6 +154,42 @@ Get event start time
 - **Returns:**
 	- `start_time` *(number|nil)*: Event start time in seconds or nil
 
+### get_end_time
+
+---
+```lua
+event:get_end_time()
+```
+
+Get event end time
+
+- **Returns:**
+	- `end_time` *(number|nil)*: Event end time in seconds, or nil for infinity events and events that have no end yet
+
+### get_cycle_count
+
+---
+```lua
+event:get_cycle_count()
+```
+
+Get how many times the event has been activated by its cycle
+
+- **Returns:**
+	- `cycle_count` *(number)*: Number of completed cycle activations, 0 for the first run
+
+### is_active
+
+---
+```lua
+event:is_active()
+```
+
+Check if the event is currently active
+
+- **Returns:**
+	- `is_active` *(boolean)*: True if the event status is "active"
+
 ### finish
 
 ---
@@ -185,7 +224,8 @@ event:cancel()
 ```
 
 Cancel this event. Sets status to "cancelled".
-Works on any status except "completed".
+Works on any status except "completed". A cancelled event is terminal: the update loop
+will not revive it, use `start()` to run it again. Cancelling an active event triggers `on_disabled`.
 
 - **Returns:**
 	- `success` *(boolean)*: True if event was cancelled

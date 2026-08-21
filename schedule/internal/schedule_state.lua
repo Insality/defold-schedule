@@ -44,6 +44,10 @@
 local M = {}
 
 
+---Prefix for automatically generated event ids
+local GENERATED_ID_PREFIX = "schedule_"
+
+
 ---Internal state
 ---@type schedule.state
 local state = {
@@ -74,6 +78,19 @@ function M.set_state(new_state)
 	state = new_state or { events = {}, last_update_time = nil, events_created = 0 }
 	if not state.events then
 		state.events = {}
+	end
+
+	-- The counter can be missing in states written by other tools or older versions.
+	-- Restore it above the highest generated id to keep new ids unique
+	if type(state.events_created) ~= "number" then
+		local events_created = 0
+		for event_id in pairs(state.events) do
+			local generated_index = tonumber(string.match(event_id, "^" .. GENERATED_ID_PREFIX .. "(%d+)$"))
+			if generated_index and generated_index > events_created then
+				events_created = generated_index
+			end
+		end
+		state.events_created = events_created
 	end
 end
 
@@ -118,8 +135,27 @@ end
 ---Return the next generated event ID
 ---@return string event_id
 function M.get_next_event_id()
-	state.events_created = state.events_created + 1
-	return "schedule_" .. state.events_created
+	state.events_created = (state.events_created or 0) + 1
+
+	-- Never hand out an id that is already taken by a user defined event
+	while state.events[GENERATED_ID_PREFIX .. state.events_created] do
+		state.events_created = state.events_created + 1
+	end
+
+	return GENERATED_ID_PREFIX .. state.events_created
+end
+
+
+---Remove event state
+---@param event_id string
+---@return boolean is_removed True if the event existed and was removed
+function M.remove_event_state(event_id)
+	if not state.events[event_id] then
+		return false
+	end
+
+	state.events[event_id] = nil
+	return true
 end
 
 

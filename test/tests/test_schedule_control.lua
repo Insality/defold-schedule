@@ -300,14 +300,13 @@ return function()
 			assert(time_left == 90, "Event should have 90 seconds left (original 90 + pause extension compensated)")
 			
 			-- Verify the end_time was extended
-			local event_state = schedule.get_status(event:get_id())
+			local event_state = schedule.get_event_state(event:get_id())
 			assert(event_state.end_time == 120, "End time should be extended to 120 (original 100 + pause 20)")
 		end)
 
 
 		it("Should not extend duration for events with hardcoded end_at", function()
 			local event = schedule.event()
-				:duration(100)
 				:end_at(200)  -- Hardcoded end time
 				:save()
 
@@ -330,7 +329,7 @@ return function()
 			assert(event:get_status() == "active", "Event should be active")
 			
 			-- End time should NOT be extended for hardcoded end_at
-			local event_state = schedule.get_status(event:get_id())
+			local event_state = schedule.get_event_state(event:get_id())
 			assert(event_state.end_time == 200, "End time should remain 200 (hardcoded, not extended)")
 			
 			-- Time left should be reduced by the pause duration

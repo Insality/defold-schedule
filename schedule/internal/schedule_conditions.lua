@@ -12,10 +12,10 @@ local conditions = {}
 
 ---Register a condition evaluator
 ---@param name string Condition name
----@param evaluator fun(data: any): boolean
+---@param evaluator (fun(data: any): boolean)|nil Evaluator function, nil to unregister
 function M.register_condition(name, evaluator)
 	conditions[name] = evaluator
-	logger:debug("Condition registered", { name = name })
+	logger:debug(evaluator and "Condition registered" or "Condition unregistered", { name = name })
 end
 
 

@@ -147,11 +147,12 @@ return function()
 				:end_at(150)
 				:save()
 
-			assert(event:get_status() == "active", "Event should be active immediately")
+			-- A new event is pending until the first update, so conditions and min_time are applied
+			assert(event:get_status() == "pending", "Event should be pending before the first update")
 			assert(event:get_time_left() == 50, "Event should have 50 seconds left")
 
 			schedule.update()
-			assert(event:get_status() == "active", "Event should still be active")
+			assert(event:get_status() == "active", "Event should be active inside its window")
 			assert(event:get_time_left() == 50, "Event should have 50 seconds left")
 
 			time = 150

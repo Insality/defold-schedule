@@ -2,100 +2,96 @@ return function()
 	describe("Schedule Cycles Yearly", function()
 		local schedule ---@type schedule
 		local schedule_time
+		local cycles
 		local time = 0
+
+		-- 2026-01-01T00:00:00 UTC
+		local JAN_1 = 1767225600
 
 		before(function()
 			schedule = require("schedule.schedule")
 			schedule_time = require("schedule.internal.schedule_time")
+			cycles = require("schedule.internal.schedule_cycles")
 
 			schedule.reset_state()
 			schedule_time.set_time_function(function() return time end)
 			time = 0
 		end)
 
-		it("Should cycle yearly on specified month and day", function()
+		---Format a timestamp as "YYYY-MM-DD HH:MM" for readable assertions
+		local function as_date(timestamp)
+			local year, month, day, hour, minute = schedule_time.timestamp_to_date(timestamp)
+			return string.format("%04d-%02d-%02d %02d:%02d", year, month, day, hour, minute)
+		end
+
+		it("Should calculate the next yearly occurrence", function()
+			local next_cycle = cycles.calculate_next_cycle({ type = "yearly", month = 12, day = 25 }, JAN_1)
+
+			assert(as_date(next_cycle) == "2026-12-25 00:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should respect the time option", function()
+			local next_cycle = cycles.calculate_next_cycle(
+				{ type = "yearly", month = 12, day = 25, time = "18:00" }, JAN_1)
+
+			assert(as_date(next_cycle) == "2026-12-25 18:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should roll to the next year when the date has passed", function()
+			-- 2026-12-26, targeting December 25th
+			local next_cycle = cycles.calculate_next_cycle(
+				{ type = "yearly", month = 12, day = 25 }, JAN_1 + 359 * 86400)
+
+			assert(as_date(next_cycle) == "2027-12-25 00:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should keep the current year when the target time is still ahead", function()
+			-- 2026-01-01 08:00, targeting January 1st at 20:00
+			local next_cycle = cycles.calculate_next_cycle(
+				{ type = "yearly", month = 1, day = 1, time = "20:00" }, JAN_1 + 8 * 3600)
+
+			assert(as_date(next_cycle) == "2026-01-01 20:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should clamp February 29th on non leap years", function()
+			-- 2027 is not a leap year
+			local next_cycle = cycles.calculate_next_cycle(
+				{ type = "yearly", month = 2, day = 29 }, JAN_1 + 365 * 86400)
+
+			assert(as_date(next_cycle) == "2027-02-28 00:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should default to January 1st", function()
+			local next_cycle = cycles.calculate_next_cycle({ type = "yearly" }, JAN_1 + 5 * 86400)
+
+			assert(as_date(next_cycle) == "2027-01-01 00:00", "Got " .. as_date(next_cycle))
+		end)
+
+
+		it("Should cycle a yearly event through update", function()
+			time = JAN_1
 			local event = schedule.event()
-				:category("yearly_event")
-				:cycle("yearly", { month = 1, day = 1, time = "00:00", skip_missed = true })
+				:category("anniversary")
+				:cycle("yearly", { month = 6, day = 1, time = "12:00" })
 				:duration(86400)
 				:save()
 
-			assert(event ~= nil, "Status should exist")
-		end)
+			schedule.update()
+			assert(event:get_status() == "pending", "Should wait for June 1st")
 
+			-- 2026-06-01 12:00
+			time = JAN_1 + 151 * 86400 + 12 * 3600
+			schedule.update()
+			assert(event:get_status() == "active", "Should activate on June 1st")
 
-		it("Should cycle yearly with specific time", function()
-			local event = schedule.event()
-				:category("yearly_event")
-				:cycle("yearly", { month = 12, day = 25, time = "12:00", skip_missed = true })
-				:duration(3600)
-				:save()
-
-			assert(event ~= nil, "Status should exist")
-		end)
-
-
-		it("Should handle February 29 edge case", function()
-			local event = schedule.event()
-				:category("yearly_event")
-				:cycle("yearly", { month = 2, day = 29, time = "00:00", skip_missed = true })
-				:duration(86400)
-				:save()
-
-			assert(event ~= nil, "Status should exist")
-		end)
-
-
-		it("Should handle different month lengths", function()
-			local test_cases = {
-				{ month = 1, day = 31 },
-				{ month = 2, day = 28 },
-				{ month = 3, day = 31 },
-				{ month = 4, day = 30 },
-				{ month = 5, day = 31 },
-				{ month = 6, day = 30 },
-				{ month = 7, day = 31 },
-				{ month = 8, day = 31 },
-				{ month = 9, day = 30 },
-				{ month = 10, day = 31 },
-				{ month = 11, day = 30 },
-				{ month = 12, day = 31 }
-			}
-
-			for _, test_case in ipairs(test_cases) do
-				local event = schedule.event()
-					:category("yearly_event")
-					:cycle("yearly", { month = test_case.month, day = test_case.day, time = "00:00", skip_missed = true })
-					:duration(86400)
-					:save()
-
-				assert(event ~= nil, "Status should exist for month " .. test_case.month .. " day " .. test_case.day)
-			end
-		end)
-
-
-		it("Should skip missed yearly cycles when skip_missed is true", function()
-			local event = schedule.event()
-				:category("yearly_event")
-				:cycle("yearly", { month = 1, day = 1, time = "00:00", skip_missed = true })
-				:duration(86400)
-				:save()
-
-			assert(event ~= nil, "Status should exist")
-		end)
-
-
-		it("Should handle all months", function()
-			for month = 1, 12 do
-				local event = schedule.event()
-					:category("yearly_event")
-					:cycle("yearly", { month = month, day = 1, time = "00:00", skip_missed = true })
-					:duration(86400)
-					:save()
-
-				assert(event ~= nil, "Status should exist for month " .. month)
-			end
+			time = time + 86400
+			schedule.update()
+			assert(event:get_status() == "completed", "Should complete after the duration")
 		end)
 	end)
 end
-

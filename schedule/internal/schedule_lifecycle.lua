@@ -17,6 +17,10 @@ local queue = require("event.queue")
 local M = {}
 
 
+---How many unhandled events are kept in the queue for late subscribers
+local MAX_PENDING_EVENTS = 128
+
+
 ---Internal callback storage
 ---@type table<string, table<string, function|string>>
 local callbacks = {}
@@ -74,7 +78,9 @@ local CALLBACK_TO_EVENT = {
 
 
 ---Push event to queue
----@param event_type string Event type ("start", "end", "enabled", "disabled", "fail", "active")
+---Unhandled events are kept so late subscribers can catch up, but only the most recent ones:
+---a game that never subscribes would otherwise grow the queue for the whole session.
+---@param event_type string Event type ("start", "end", "enabled", "disabled", "fail")
 ---@param event_data table Event data to push
 function M.push_event(event_type, event_data)
 	M.event_queue:push({
@@ -86,6 +92,11 @@ function M.push_event(event_type, event_data)
 		start_time = event_data.start_time,
 		end_time = event_data.end_time
 	})
+
+	local pending_events = M.event_queue:get_events()
+	while #pending_events > MAX_PENDING_EVENTS do
+		table.remove(pending_events, 1)
+	end
 end
 
 
