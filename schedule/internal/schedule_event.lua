@@ -175,8 +175,10 @@ function M:get_end_time()
 end
 
 
----Get how many times the event has been activated by its cycle
----@return number cycle_count Number of completed cycle activations, 0 for the first run
+---Get how many times the event has been activated by its cycle.
+---With `start_at` + `every`, this is the occurrence index on the calendar grid (0 for the first
+---window), including occurrences skipped by `min_time` or `skip_missed`.
+---@return number cycle_count Number of cycle activations, 0 for the first run
 function M:get_cycle_count()
 	return self.state.cycle_count or 0
 end

@@ -238,6 +238,7 @@ It starts with the two ways to use the schedule - **pull** (keep the event id an
 - Re-declaring an event with `start_at` keeps the stored occurrence timings
 - `catch_up(false)` does not replay a fully missed window
 - Default `payload` to `{}`
+- Cyclic `start_at` + `every` uses the calendar occurrence as `cycle_count`
 
 </details>
 

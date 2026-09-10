@@ -173,10 +173,12 @@ Get event end time
 event:get_cycle_count()
 ```
 
-Get how many times the event has been activated by its cycle
+Get how many times the event has been activated by its cycle.
+With `start_at` + `every`, this is the occurrence index on the calendar grid (0 for the first
+window), including occurrences skipped by `min_time` or `skip_missed`.
 
 - **Returns:**
-	- `cycle_count` *(number)*: Number of completed cycle activations, 0 for the first run
+	- `cycle_count` *(number)*: Number of cycle activations, 0 for the first run
 
 ### is_active
 
