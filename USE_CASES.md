@@ -301,7 +301,8 @@ schedule.event("starter_offer")
 Add `:abort_on_fail()` when a missed condition means the offer is gone for good. The event becomes
 `aborted`, `on_fail` is called once, and the schedule never retries it.
 
-Use `:min_time()` to avoid starting something that is about to expire:
+Use `:min_time()` to avoid starting something that is about to expire. A one-shot event is
+cancelled; a cyclic event skips this occurrence and waits for the next one:
 
 ```lua
 schedule.event("season_sale")
@@ -430,4 +431,4 @@ schedule.clear() -- Everything
 - **`cancelled` and `aborted` are final.** The update loop never revives them, call `event:start()`
   to run such an event anyway.
 - **A new event is `pending`** until the first `update()`, which is where conditions and `min_time`
-  are checked.
+  are checked. `min_time` cancels a one-shot and skips a cyclic occurrence.

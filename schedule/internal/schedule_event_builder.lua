@@ -222,7 +222,9 @@ function M:catch_up(catch_up)
 end
 
 
----Set the minimum time remaining required for the event to start. If less time remains, the event is cancelled.
+---Set the minimum time remaining required for the event to start.
+---If less time remains, a one-shot event is cancelled; a cyclic event skips this occurrence
+---and waits for the next one, the same way later cycles are skipped.
 ---Use for LiveOps events or limited-time offers to prevent wasted activations.
 ---@param min_time number Minimum seconds remaining required to start (use `schedule.DAY`, etc.)
 ---@return schedule.event_builder Self for method chaining

@@ -146,6 +146,51 @@ return function()
 			schedule.update()
 			assert(event:get_status() == "active", "Event should still be active with exactly min_time remaining")
 		end)
+
+
+		it("Should skip a cyclic occurrence instead of cancelling when min_time is not met", function()
+			local event = schedule.event("puzzle")
+				:category("liveops")
+				:start_at(0)
+				:duration(100)
+				:cycle("every", { seconds = 200, skip_missed = true })
+				:min_time(50)
+				:save()
+
+			-- First window is 0..100; at t=80 only 20 remain, below min_time
+			time = 80
+			schedule.update()
+			assert(event:get_status() ~= "cancelled",
+				"Cyclic event should skip the occurrence, not cancel, got " .. event:get_status())
+
+			time = 200
+			schedule.update()
+			assert(event:get_status() == "active", "Should start the next occurrence, got " .. event:get_status())
+			assert(event:get_start_time() == 200, "Next occurrence should start at 200, got " .. tostring(event:get_start_time()))
+		end)
+
+
+		it("Should catch up a cyclic event with a past anchor and min_time to the current occurrence", function()
+			local event = schedule.event("puzzle")
+				:category("liveops")
+				:start_at("2026-01-01T00:00:00")
+				:duration(schedule.DAY)
+				:cycle("every", { seconds = 2 * schedule.DAY, skip_missed = true })
+				:min_time(schedule.HOUR)
+				:save()
+
+			-- Far past the first window, inside a later puzzle day (Jan 1 + 252 days = Sep 10)
+			local jan_1 = 1767225600
+			time = jan_1 + 252 * schedule.DAY + 12 * schedule.HOUR
+			schedule.update()
+
+			assert(event:get_status() ~= "cancelled",
+				"min_time must not terminate a cyclic event, got " .. event:get_status())
+			assert(event:get_status() == "active",
+				"Should land on the current occurrence, got " .. event:get_status())
+			assert(event:get_start_time() == jan_1 + 252 * schedule.DAY,
+				"Current occurrence should keep the cycle grid, got " .. tostring(event:get_start_time()))
+		end)
 	end)
 end
 

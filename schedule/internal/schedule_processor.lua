@@ -109,11 +109,6 @@ function M.should_start_event(event_id, event_state, current_time, last_update_t
 		return false
 	end
 
-	if M._is_below_min_time(event_state, start_time, current_time) then
-		event_state.status = "cancelled"
-		return false
-	end
-
 	return true
 end
 
@@ -134,6 +129,33 @@ function M._is_below_min_time(event_state, start_time, current_time)
 	end
 
 	return (end_time - current_time) <= event_state.min_time
+end
+
+
+---If the remaining window is shorter than min_time, cancel a one-shot event.
+---A cyclic event skips this occurrence instead, the same way later cycles are skipped.
+---@param event_id string
+---@param event_state schedule.event.state
+---@param start_time number
+---@param current_time number
+---@return boolean handled True if the start was rejected (cancelled or skipped)
+function M._cancel_or_skip_min_time(event_id, event_state, start_time, current_time)
+	if not M._is_below_min_time(event_state, start_time, current_time) then
+		return false
+	end
+
+	if not event_state.cycle then
+		event_state.status = "cancelled"
+		return true
+	end
+
+	-- The first occurrence is treated like any later one: skip it and look at the next
+	event_state.status = "completed"
+	event_state.start_time = start_time
+	event_state.end_time = M.calculate_end_time(event_state, start_time)
+	event_state.last_update_time = current_time
+	M.process_cycle(event_id, event_state, current_time)
+	return true
 end
 
 
@@ -540,9 +562,8 @@ function M.update_event(event_id, current_time, last_update_time)
 		-- Catch-up (or other earlier work in this call) may have already moved the event
 		-- out of a startable status; only start/cancel when it is still pending
 		if M._is_startable_status(event_state.status) and start_time and current_time >= start_time then
-			if M._is_below_min_time(event_state, start_time, current_time) then
-				event_state.status = "cancelled"
-				return false
+			if M._cancel_or_skip_min_time(event_id, event_state, start_time, current_time) then
+				return event_state.status == "active"
 			end
 
 			local should_start = M.should_start_event(event_id, event_state, current_time, last_update_time)

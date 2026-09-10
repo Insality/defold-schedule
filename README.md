@@ -148,7 +148,7 @@ schedule.event()
 	:duration(time)
 	:end_at(time)
 	:infinity() -- Works until manual cancellation
-	:min_time(time) -- Do not start if not enough time left
+	:min_time(time) -- Do not start if not enough time left; cyclic events skip to the next occurrence
 	-- Conditions
 	:condition(condition_name, data)
 	:abort_on_fail() -- Abort event when conditions fail
