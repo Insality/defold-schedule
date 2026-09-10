@@ -48,11 +48,11 @@ return function()
 			-- First window 0..100 is over; next starts at 200
 			time = 150
 			schedule.update()
-			assert(event:get_status() ~= "pending" or event:get_start_time() == 200,
-				"Must not stay pending on the ended window, status=" .. event:get_status() ..
-					" start=" .. tostring(event:get_start_time()))
-			assert(event:get_start_time() == 200,
-				"Next window should start at 200, got " .. tostring(event:get_start_time()))
+			assert(event:get_status() == "completed",
+				"Missed window should complete, got " .. event:get_status())
+			assert(schedule.get_event_state("sale").next_cycle_time == 200,
+				"Next window should be scheduled at 200, got " ..
+					tostring(schedule.get_event_state("sale").next_cycle_time))
 
 			time = 200
 			schedule.update()

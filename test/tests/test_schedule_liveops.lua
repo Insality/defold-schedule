@@ -79,9 +79,9 @@ return function()
 			assert(active_id == "puzzle", "Sep 10 is a puzzle day, got " .. tostring(active_id))
 			assert(schedule.get("puzzle"):get_cycle_count() == 126,
 				"Puzzle should be occurrence 126 on the Jan 1 grid, got " .. schedule.get("puzzle"):get_cycle_count())
-			assert(schedule.get("diamond"):get_start_time() == JAN_1 + 253 * DAY,
-				"Diamond should already be on the next window (Sep 11), got " ..
-					tostring(schedule.get("diamond"):get_start_time()))
+			assert(schedule.get_event_state("diamond").next_cycle_time == JAN_1 + 253 * DAY,
+				"Diamond should already be scheduled for Sep 11, got " ..
+					tostring(schedule.get_event_state("diamond").next_cycle_time))
 
 			-- 3. fortune waits on level 1
 			assert(schedule.get("fortune"):get_status() == "pending", "fortune should wait for level 7")

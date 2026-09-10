@@ -523,10 +523,6 @@ function M._process_next_cycle(event_id, event_state, current_time)
 
 		if not next_cycle_time or next_cycle_time > current_time then
 			event_state.next_cycle_time = next_cycle_time
-			if next_cycle_time then
-				event_state.start_time = next_cycle_time
-				event_state.end_time = M.calculate_end_time(event_state, next_cycle_time)
-			end
 			return false
 		end
 
@@ -539,8 +535,6 @@ function M._process_next_cycle(event_id, event_state, current_time)
 			return true
 		end
 
-		event_state.start_time = new_start_time
-		event_state.end_time = new_end_time
 		event_state.next_cycle_time = skipped_cycle_time
 	end
 
