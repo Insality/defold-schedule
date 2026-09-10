@@ -13,6 +13,54 @@ return function()
 			time = 0
 		end)
 
+		it("Should not replay a fully missed window when catch_up is false", function()
+			local runs = {}
+			schedule.on_event:subscribe(function(event)
+				if event.event_id == "sale" then
+					table.insert(runs, event.callback_type)
+				end
+				return true
+			end)
+
+			local event = schedule.event("sale")
+				:start_at(100)
+				:duration(100)
+				:catch_up(false)
+				:save()
+
+			-- Window was 100..200; now is 1000
+			time = 1000
+			schedule.update()
+
+			assert(event:get_status() == "completed", "Missed window should complete, got " .. event:get_status())
+			assert(#runs == 0, "catch_up(false) must not replay start/enabled/end/disabled, got " .. table.concat(runs, ","))
+		end)
+
+
+		it("Should replay a fully missed window when catch_up is true", function()
+			local runs = {}
+			schedule.on_event:subscribe(function(event)
+				if event.event_id == "sale" then
+					table.insert(runs, event.callback_type)
+				end
+				return true
+			end)
+
+			local event = schedule.event("sale")
+				:start_at(100)
+				:duration(100)
+				:catch_up(true)
+				:save()
+
+			time = 1000
+			schedule.update()
+
+			assert(event:get_status() == "completed", "Missed window should complete")
+			assert(table.concat(runs, ",") == "start,enabled,end,disabled",
+				"catch_up(true) should replay the lifecycle, got " .. table.concat(runs, ","))
+		end)
+
+
 		it("Should catch up missed events when catch_up is true", function()
 			local count = 0
 

@@ -242,7 +242,7 @@ at once. Pick the option that matches your design:
 | `catch_up(true)`                             | 60 rewards, 60 callbacks in one update |
 | `catch_up(true)` + `max_catches = 7`         | 7 rewards                    |
 | `catch_up(true)` + `skip_missed = true`      | 1 reward                     |
-| `catch_up(false)`                            | 1 reward                     |
+| `catch_up(false)`                            | 0 rewards, unless you are inside a running occurrence |
 
 Two practical notes: the callbacks run synchronously, so grant resources there and show one summary
 popup afterwards instead of one popup per reward. And keep `max_catches` on frequent cycles - the
@@ -426,8 +426,9 @@ schedule.clear() -- Everything
   absolute time and does not need frequent updates.
 - **All times are UTC.** `"2026-01-01T00:00:00"` and `time = "14:00"` are UTC, there is no local time
   zone conversion.
-- **`catch_up` only matters for cycles.** A single event that ran out while the game was closed is
-  always completed on the next update. Default: `false` for events with a duration, `true` without.
+- **`catch_up(false)` does not replay a fully missed window.** The event is marked `completed`
+  without `start` / `enabled` / `end` / `disabled`. Set `catch_up(true)` to replay that run
+  (and missed cycles). Default: `false` for events with a duration, `true` without.
 - **`cancelled` and `aborted` are final.** The update loop never revives them, call `event:start()`
   to run such an event anyway.
 - **Re-declaring an event keeps the stored occurrence**, even when `start_at` is set. To change

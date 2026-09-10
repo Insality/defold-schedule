@@ -570,10 +570,16 @@ function M.update_event(event_id, current_time, last_update_time)
 			if should_start then
 				local end_time = M.calculate_end_time(event_state, start_time)
 
-				-- The event ran out while the game was closed. Emit the whole lifecycle at once
-				-- instead of reporting a window that is already over as active
+				-- The event ran out while the game was closed. Replay the lifecycle only when
+				-- catch_up is on; LiveOps windows that were fully missed stay silent
 				if end_time and current_time >= end_time then
-					M._replay_event_run(event_id, event_state, start_time, end_time, current_time)
+					if event_state.catch_up then
+						M._replay_event_run(event_id, event_state, start_time, end_time, current_time)
+					else
+						event_state.start_time = start_time
+						event_state.end_time = end_time
+						event_state.last_update_time = current_time
+					end
 					event_state.status = "completed"
 
 					if event_state.cycle then

@@ -193,7 +193,9 @@ event_builder:catch_up(catch_up)
 
 Set whether the event should catch up on missed time when the game resumes after being offline.
 Enable for offline progression (crafting, daily rewards). Disable for LiveOps or time-sensitive events.
-Events with a duration (or an `end_at`) default to `false`, events without one default to `true`.
+When false, a fully missed window is marked `completed` without emitting start/enabled/end/disabled.
+When true, that missed run is replayed. Cycles also replay missed occurrences only when this is true
+(and `skip_missed` is not set). Events with a duration (or an `end_at`) default to `false`, events without one default to `true`.
 
 - **Parameters:**
 	- `catch_up` *(boolean)*: true to enable offline catch-up, false to disable

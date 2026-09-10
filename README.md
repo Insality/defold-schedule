@@ -157,7 +157,7 @@ schedule.event()
 	:cycle("weekly", { weekdays = {"sun"}, time = "HH:MM", skip_missed = true })
 	:cycle("monthly", { day = 1..31, time = "HH:MM", skip_missed = true })
 	:cycle("yearly", { month = 1..12, day = 1..31, time = "HH:MM", skip_missed = true })
-	:catch_up(true|false) -- Replay occurrences missed while offline. Default: false with a duration, true without
+	:catch_up(true|false) -- Replay a fully missed window / missed cycles. Default: false with a duration, true without
 	-- Lifecycle callbacks, all receive { event_id, category, payload, status, start_time, end_time }
 	:on_start(callback) -- Event activated
 	:on_enabled(callback) -- Event became active, also on state restore and on catch-up
