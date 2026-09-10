@@ -223,6 +223,25 @@ It starts with the two ways to use the schedule - **pull** (keep the event id an
 **push** (attach callbacks and let the schedule call you) - and when to pick which.
 
 
+## Changelog
+
+<details>
+
+### **V1**
+- Initial Release
+
+### **V2**
+- Tests, refactor, docs, annotations
+
+### **V3**
+- Cyclic `min_time` skips the occurrence instead of cancelling the event
+- Re-declaring an event with `start_at` keeps the stored occurrence timings
+- `catch_up(false)` does not replay a fully missed window
+- Default `payload` to `{}`
+
+</details>
+
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
