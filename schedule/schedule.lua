@@ -86,7 +86,8 @@ end
 ---Restore schedule state from serialization. Call immediately after loading saved game data,
 ---before declaring your events. Restores all events to their previous state, the next `update()` catches up
 ---the time that passed since the state was saved. Lifecycle callbacks are not serializable: re-declare your
----events with `schedule.event(id)` after restoring to attach them again, it keeps the stored timings.
+---events with `schedule.event(id)` after restoring to attach them again, it keeps the stored timings
+---(including `start_at` occurrences). To change the calendar window, `remove()` the event and create it again.
 ---@param new_state schedule.state State object previously obtained from `get_state()`
 function M.set_state(new_state)
 	state.set_state(new_state)

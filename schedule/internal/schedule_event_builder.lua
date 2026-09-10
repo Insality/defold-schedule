@@ -318,14 +318,15 @@ local CALENDAR_CYCLES = {
 ---@param existing_start_time number|nil Existing start time to preserve (nil for new events)
 ---@return number|nil calculated_start_time
 function M._calculate_start_time(config, current_time, existing_start_time)
-	if config.start_at then
-		return time.normalize_time(config.start_at)
-	end
-
-	-- A persisted start time always wins, otherwise re-declaring an event on game start
-	-- would push its timer forward on every launch
+	-- A persisted start time always wins, including when `start_at` is set: re-declaring
+	-- an event on game start must keep the current occurrence, not reset it to the calendar
+	-- anchor. To change the schedule, `remove()` the event and create it again
 	if existing_start_time then
 		return existing_start_time
+	end
+
+	if config.start_at then
+		return time.normalize_time(config.start_at)
 	end
 
 	if config.after then
@@ -350,12 +351,17 @@ end
 ---@param existing_end_time number|nil Existing end time to preserve (nil for new events)
 ---@return number|nil calculated_end_time
 function M._calculate_end_time(config, start_time, existing_end_time)
+	-- Keep the stored window of a running occurrence across re-declaration
+	if existing_end_time then
+		return existing_end_time
+	end
+
 	if config.end_at then
 		return time.normalize_time(config.end_at)
 	elseif config.duration and start_time then
 		return start_time + config.duration
 	end
-	return existing_end_time
+	return nil
 end
 
 
@@ -449,7 +455,9 @@ end
 
 ---Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 ---Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
----and callbacks are registered. If an existing event with the same ID exists, its state is merged.
+---and callbacks are registered. If an existing event with the same ID exists, its state is merged:
+---stored `start_time` / `end_time` of the current occurrence are kept, even when `start_at` is set.
+---To change the calendar window, `schedule.remove(id)` and create the event again.
 ---Returns the created event object, with methods like `get_time_left()` and `get_status()`.
 ---@return schedule.event event Created event instance
 function M:save()

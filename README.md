@@ -170,6 +170,8 @@ schedule.event()
 
 Statuses: an event goes `pending` to `active` to `completed`. `cancelled` and `aborted` are terminal,
 the update loop never revives them, use `event:start()` to run such an event anyway.
+Re-declaring an event with the same id keeps the stored `start_time` / `end_time` of the current
+occurrence, even when `start_at` is set. To change the calendar, `remove()` it and create it again.
 
 For detailed API documentation, please refer to:
 - [API Reference](api/schedule_api.md)
@@ -191,7 +193,8 @@ function init(self)
 	saver.bind_save_state("schedule", schedule.get_state())
 
 	-- Declare your events after the state is restored.
-	-- Re-declaring an event with the same id keeps its stored timings and re-attaches the callbacks
+	-- Re-declaring an event with the same id keeps its stored timings (including start_at
+	-- occurrences) and re-attaches the callbacks
 	schedule.event("craft_sword")
 		:category("craft")
 		:after(schedule.HOUR)

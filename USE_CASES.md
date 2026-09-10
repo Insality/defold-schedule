@@ -430,5 +430,7 @@ schedule.clear() -- Everything
   always completed on the next update. Default: `false` for events with a duration, `true` without.
 - **`cancelled` and `aborted` are final.** The update loop never revives them, call `event:start()`
   to run such an event anyway.
+- **Re-declaring an event keeps the stored occurrence**, even when `start_at` is set. To change
+  the calendar, `remove()` it and create it again.
 - **A new event is `pending`** until the first `update()`, which is where conditions and `min_time`
   are checked. `min_time` cancels a one-shot and skips a cyclic occurrence.

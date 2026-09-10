@@ -320,7 +320,9 @@ event_builder:save()
 
 Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
-and callbacks are registered. If an existing event with the same ID exists, its state is merged.
+and callbacks are registered. If an existing event with the same ID exists, its state is merged:
+stored `start_time` / `end_time` of the current occurrence are kept, even when `start_at` is set.
+To change the calendar window, `schedule.remove(id)` and create the event again.
 Returns the created event object, with methods like `get_time_left()` and `get_status()`.
 
 - **Returns:**
