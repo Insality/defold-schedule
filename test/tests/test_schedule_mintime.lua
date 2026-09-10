@@ -167,6 +167,7 @@ return function()
 			schedule.update()
 			assert(event:get_status() == "active", "Should start the next occurrence, got " .. event:get_status())
 			assert(event:get_start_time() == 200, "Next occurrence should start at 200, got " .. tostring(event:get_start_time()))
+			assert(event:get_cycle_count() == 1, "Skipped first window is occurrence 0, this is 1, got " .. event:get_cycle_count())
 		end)
 
 
@@ -190,6 +191,8 @@ return function()
 				"Should land on the current occurrence, got " .. event:get_status())
 			assert(event:get_start_time() == jan_1 + 252 * schedule.DAY,
 				"Current occurrence should keep the cycle grid, got " .. tostring(event:get_start_time()))
+			assert(event:get_cycle_count() == 126,
+				"Should be occurrence 126 on the Jan 1 grid, got " .. event:get_cycle_count())
 		end)
 	end)
 end

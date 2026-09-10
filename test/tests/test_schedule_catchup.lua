@@ -37,6 +37,30 @@ return function()
 		end)
 
 
+		it("Should continue a cyclic event after a missed window without replaying it", function()
+			local event = schedule.event("sale")
+				:start_at(0)
+				:duration(100)
+				:cycle("every", { seconds = 200, skip_missed = true })
+				:catch_up(false)
+				:save()
+
+			-- First window 0..100 is over; next starts at 200
+			time = 150
+			schedule.update()
+			assert(event:get_status() ~= "pending" or event:get_start_time() == 200,
+				"Must not stay pending on the ended window, status=" .. event:get_status() ..
+					" start=" .. tostring(event:get_start_time()))
+			assert(event:get_start_time() == 200,
+				"Next window should start at 200, got " .. tostring(event:get_start_time()))
+
+			time = 200
+			schedule.update()
+			assert(event:get_status() == "active", "Should start the next occurrence, got " .. event:get_status())
+			assert(event:get_cycle_count() == 1, "This is occurrence 1 on the grid, got " .. event:get_cycle_count())
+		end)
+
+
 		it("Should replay a fully missed window when catch_up is true", function()
 			local runs = {}
 			schedule.on_event:subscribe(function(event)

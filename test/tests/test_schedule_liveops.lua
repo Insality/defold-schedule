@@ -77,6 +77,11 @@ return function()
 			local active_count, active_id = count_active("liveops")
 			assert(active_count == 1, "Exactly one liveops event should be active, got " .. active_count)
 			assert(active_id == "puzzle", "Sep 10 is a puzzle day, got " .. tostring(active_id))
+			assert(schedule.get("puzzle"):get_cycle_count() == 126,
+				"Puzzle should be occurrence 126 on the Jan 1 grid, got " .. schedule.get("puzzle"):get_cycle_count())
+			assert(schedule.get("diamond"):get_start_time() == JAN_1 + 253 * DAY,
+				"Diamond should already be on the next window (Sep 11), got " ..
+					tostring(schedule.get("diamond"):get_start_time()))
 
 			-- 3. fortune waits on level 1
 			assert(schedule.get("fortune"):get_status() == "pending", "fortune should wait for level 7")
@@ -87,6 +92,8 @@ return function()
 			active_count, active_id = count_active("liveops")
 			assert(active_count == 1, "Still exactly one active after a day, got " .. active_count)
 			assert(active_id == "diamond", "Sep 11 is a diamond day, got " .. tostring(active_id))
+			assert(schedule.get("diamond"):get_cycle_count() == 126,
+				"Diamond should be occurrence 126 on the Jan 2 grid, got " .. schedule.get("diamond"):get_cycle_count())
 
 			-- 3. fortune opens at level 7 without a restart
 			player_level = 7

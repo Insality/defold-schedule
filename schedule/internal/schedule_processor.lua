@@ -216,6 +216,45 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 end
 
 
+---Occurrence index on an `every` + `start_at` grid (0 for the first window).
+---Nil when the event has no calendar anchor, the caller should then increment.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil index
+function M._occurrence_index(event_state, occurrence_start)
+	local cycle_config = event_state.cycle
+	if not cycle_config or cycle_config.type ~= "every" or not occurrence_start then
+		return nil
+	end
+
+	local interval = cycle_config.seconds
+	if not interval or interval <= 0 then
+		return nil
+	end
+
+	local anchor = event_state.start_at and time.normalize_time(event_state.start_at) or nil
+	if not anchor then
+		return nil
+	end
+
+	return math.max(0, math.floor((occurrence_start - anchor) / interval + 1e-9))
+end
+
+
+---Set cycle_count to the calendar occurrence index, or increment when there is no grid.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@param increment_if_unknown boolean
+function M._set_cycle_count(event_state, occurrence_start, increment_if_unknown)
+	local index = M._occurrence_index(event_state, occurrence_start)
+	if index then
+		event_state.cycle_count = index
+	elseif increment_if_unknown then
+		event_state.cycle_count = (event_state.cycle_count or 0) + 1
+	end
+end
+
+
 ---Activate a cycle for an event
 ---@param event_id string
 ---@param event_state schedule.event.state
@@ -225,7 +264,7 @@ function M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
 	event_state.status = "active"
 	event_state.start_time = new_start_time
 	event_state.end_time = new_end_time
-	event_state.cycle_count = (event_state.cycle_count or 0) + 1
+	M._set_cycle_count(event_state, new_start_time, true)
 	event_state.next_cycle_time = nil
 
 	M._update_chained_events(event_id)
@@ -248,12 +287,11 @@ function M._should_skip_cycle(event_state, new_start_time, new_end_time, current
 		return false, nil
 	end
 
-	local skipped_cycle_time = cycles.calculate_next_cycle(
-		event_state.cycle,
-		current_time,
-		new_end_time,
-		event_state.start_time
-	)
+	-- Stay on the same interval grid as later cycles, do not jump from `now`
+	local skipped_cycle_time = M._next_cycle_after(event_state, new_start_time, current_time)
+	if skipped_cycle_time == new_start_time then
+		skipped_cycle_time = M._following_cycle(event_state, new_start_time)
+	end
 	return true, skipped_cycle_time
 end
 
@@ -480,26 +518,33 @@ end
 ---@param current_time number
 ---@return boolean processed True if cycle was processed
 function M._process_next_cycle(event_id, event_state, current_time)
-	local next_cycle_time = M._resolve_cycle_time(event_state, current_time)
+	for _ = 1, MAX_CYCLE_STEPS do
+		local next_cycle_time = M._resolve_cycle_time(event_state, current_time)
 
-	if not next_cycle_time or next_cycle_time > current_time then
-		event_state.next_cycle_time = next_cycle_time
-		return false
-	end
-
-	local new_start_time = next_cycle_time
-	local new_end_time = M.calculate_end_time(event_state, new_start_time)
-
-	local should_skip, skipped_cycle_time = M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
-	if should_skip then
-		if skipped_cycle_time then
-			event_state.next_cycle_time = skipped_cycle_time
+		if not next_cycle_time or next_cycle_time > current_time then
+			event_state.next_cycle_time = next_cycle_time
+			if next_cycle_time then
+				event_state.start_time = next_cycle_time
+				event_state.end_time = M.calculate_end_time(event_state, next_cycle_time)
+			end
+			return false
 		end
-		return false
+
+		local new_start_time = next_cycle_time
+		local new_end_time = M.calculate_end_time(event_state, new_start_time)
+
+		local should_skip, skipped_cycle_time = M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
+		if not should_skip then
+			M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
+			return true
+		end
+
+		event_state.start_time = new_start_time
+		event_state.end_time = new_end_time
+		event_state.next_cycle_time = skipped_cycle_time
 	end
 
-	M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
-	return true
+	return false
 end
 
 
@@ -754,6 +799,7 @@ function M._activate_event(event_id, event_state, start_time, end_time, current_
 	event_state.start_time = start_time
 	event_state.end_time = end_time
 	event_state.last_update_time = current_time
+	M._set_cycle_count(event_state, start_time, false)
 
 	local event_data = M._create_event_data(event_id, event_state)
 	lifecycle.on_start(event_id, event_data)
@@ -848,7 +894,7 @@ end
 ---@param current_time number
 function M._apply_catchup_cycle(event_id, event_state, cycle_start, cycle_end, current_time)
 	catchup_counts[event_id] = (catchup_counts[event_id] or 0) + 1
-	event_state.cycle_count = (event_state.cycle_count or 0) + 1
+	M._set_cycle_count(event_state, cycle_start, true)
 	M._replay_event_run(event_id, event_state, cycle_start, cycle_end, current_time)
 end
 
