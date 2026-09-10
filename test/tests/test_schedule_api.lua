@@ -91,6 +91,15 @@ return function()
 		end)
 
 
+		it("Should default payload to an empty table", function()
+			local event = schedule.event("craft"):duration(10):save()
+
+			assert(event:get_payload() ~= nil, "Payload should not be nil")
+			assert(event:get_payload().missing == nil, "Default payload should be an empty table")
+			assert(schedule.get_event_state("craft").payload ~= nil, "Raw state payload should not be nil")
+		end)
+
+
 		it("Should expose event getters", function()
 			local event = schedule.event("craft")
 				:category("craft")

@@ -200,6 +200,7 @@ end
 
 
 ---Set custom data payload passed to event handlers and callbacks. Included in all event notifications.
+---When omitted, `payload` is `{}` so `state.payload.version` is safe without a nil check.
 ---Store lightweight data (IDs, configuration objects). Avoid large objects or functions.
 ---@param payload any Custom data object to attach to the event
 ---@return schedule.event_builder Self for method chaining
@@ -412,6 +413,10 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 	-- A new event always starts pending. The first update() activates it, so conditions,
 	-- min_time and the start callbacks are applied the same way for every event
 	local initial_status = existing_state and (existing_state.status or "pending") or "pending"
+	local payload = merge_value(config.payload, existing_state and existing_state.payload)
+	if payload == nil then
+		payload = {}
+	end
 
 	return {
 		event_id = event_id,
@@ -422,7 +427,7 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 		cycle_count = existing_state and (existing_state.cycle_count or 0) or 0,
 		next_cycle_time = existing_state and existing_state.next_cycle_time or nil,
 		category = merge_value(config.category, existing_state and existing_state.category),
-		payload = merge_value(config.payload, existing_state and existing_state.payload),
+		payload = payload,
 		after = merge_value(config.after, existing_state and existing_state.after),
 		after_options = merge_value(config.after_options, existing_state and existing_state.after_options),
 		start_at = merge_value(config.start_at, existing_state and existing_state.start_at),

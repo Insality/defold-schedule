@@ -735,7 +735,7 @@ function M._create_event_data(event_id, event_state)
 	return {
 		event_id = event_id,
 		category = event_state.category,
-		payload = event_state.payload,
+		payload = event_state.payload or {},
 		status = event_state.status,
 		start_time = event_state.start_time,
 		end_time = event_state.end_time

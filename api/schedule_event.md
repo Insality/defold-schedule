@@ -125,7 +125,7 @@ Get event progress
 event:get_payload()
 ```
 
-Get event payload
+Get event payload. Always a table; `{}` when none was set.
 
 - **Returns:**
 	- `payload` *(any)*: Event payload data

@@ -23,7 +23,7 @@
 ---@field cycle_count number|nil
 ---@field next_cycle_time number|nil
 ---@field category string|nil
----@field payload any|nil
+---@field payload any Custom data, `{}` when none was set
 ---@field after number|string|nil Seconds or event ID to chain after
 ---@field after_options table|nil Options for chaining (wait_online, etc.)
 ---@field start_at number|string|nil Timestamp or ISO date string

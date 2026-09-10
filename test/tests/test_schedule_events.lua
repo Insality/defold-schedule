@@ -96,6 +96,25 @@ return function()
 		end)
 
 
+		it("Should send an empty payload table when none was set", function()
+			local received_payload = nil
+
+			schedule.on_event:subscribe(function(event)
+				received_payload = event.payload
+				return true
+			end)
+
+			schedule.event()
+				:category("craft")
+				:duration(10)
+				:save()
+
+			schedule.update()
+			assert(received_payload ~= nil, "Payload should be a table, not nil")
+			assert(received_payload.version == nil, "Default payload should be empty")
+		end)
+
+
 		it("Should handle multiple subscribers", function()
 			local subscriber1_called = false
 			local subscriber2_called = false
