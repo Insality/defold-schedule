@@ -112,7 +112,7 @@ schedule.get_event_state(event_id)
 Get the raw event state table by ID. Use for direct state access.
 The returned table is the live internal state, changing it changes the event.
 Prefer `get()` unless you specifically need raw state access.
-`payload` is always a table, `{}` when none was set on the event.
+New events store `payload` as `{}` when omitted. A value passed to `:payload()` is kept as-is.
 
 - **Parameters:**
 	- `event_id` *(string)*: The event ID to query
@@ -262,5 +262,5 @@ Use it for cross-cutting concerns (logging, analytics), use lifecycle callbacks 
 Callback: `fun(event: table): boolean|nil`. Return `true` to mark the event as handled and drop it from
 the queue, return `nil` to leave it for other subscribers. Note that returning `false` also marks it handled.
 Event table contains: `callback_type`, `event_id`, `category`, `payload`, `status`, `start_time`, `end_time`.
-`payload` is always a table, `{}` when none was set.
+When omitted, `payload` is `{}`; a value passed to `:payload()` is kept as-is.
 `callback_type` is one of `"start"`, `"enabled"`, `"disabled"`, `"end"`, `"fail"`

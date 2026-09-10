@@ -115,6 +115,25 @@ return function()
 		end)
 
 
+		it("Should keep a false payload in event notifications", function()
+			local received_payload = "unset"
+
+			schedule.on_event:subscribe(function(event)
+				received_payload = event.payload
+				return true
+			end)
+
+			schedule.event()
+				:category("craft")
+				:duration(10)
+				:payload(false)
+				:save()
+
+			schedule.update()
+			assert(received_payload == false, "Notification payload should stay false")
+		end)
+
+
 		it("Should handle multiple subscribers", function()
 			local subscriber1_called = false
 			local subscriber2_called = false

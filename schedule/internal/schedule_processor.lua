@@ -771,10 +771,14 @@ end
 ---@param event_state schedule.event.state
 ---@return table event_data
 function M._create_event_data(event_id, event_state)
+	local payload = event_state.payload
+	if payload == nil then
+		payload = {}
+	end
 	return {
 		event_id = event_id,
 		category = event_state.category,
-		payload = event_state.payload or {},
+		payload = payload,
 		status = event_state.status,
 		start_time = event_state.start_time,
 		end_time = event_state.end_time

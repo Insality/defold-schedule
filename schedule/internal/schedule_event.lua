@@ -147,10 +147,14 @@ function M:get_progress()
 end
 
 
----Get event payload. Always a table; `{}` when none was set.
+---Get event payload. When none was set, returns `{}`. Otherwise returns the value passed to `:payload()`.
 ---@return any payload Event payload data
 function M:get_payload()
-	return self.state.payload or {}
+	local payload = self.state.payload
+	if payload == nil then
+		return {}
+	end
+	return payload
 end
 
 

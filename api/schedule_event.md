@@ -125,7 +125,7 @@ Get event progress
 event:get_payload()
 ```
 
-Get event payload. Always a table; `{}` when none was set.
+Get event payload. When none was set, returns `{}`. Otherwise returns the value passed to `:payload()`.
 
 - **Returns:**
 	- `payload` *(any)*: Event payload data

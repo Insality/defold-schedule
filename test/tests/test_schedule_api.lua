@@ -100,6 +100,14 @@ return function()
 		end)
 
 
+		it("Should keep a false payload instead of replacing it with a table", function()
+			local event = schedule.event("craft"):duration(10):payload(false):save()
+
+			assert(event:get_payload() == false, "false payload must not become {}")
+			assert(schedule.get_event_state("craft").payload == false, "Raw state should keep false")
+		end)
+
+
 		it("Should expose event getters", function()
 			local event = schedule.event("craft")
 				:category("craft")
