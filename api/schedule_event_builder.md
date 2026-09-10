@@ -176,7 +176,7 @@ event_builder:payload([payload])
 ```
 
 Set custom data payload passed to event handlers and callbacks. Included in all event notifications.
-When omitted, `payload` is `{}` so `state.payload.version` is safe without a nil check.
+When omitted, `payload` is `{}`. A value passed to `:payload()` is kept as-is and is not coerced to a table.
 Store lightweight data (IDs, configuration objects). Avoid large objects or functions.
 
 - **Parameters:**

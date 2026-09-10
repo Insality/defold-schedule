@@ -108,6 +108,17 @@ return function()
 		end)
 
 
+		it("Should persist a default payload table into legacy nil state", function()
+			local event = schedule.event("craft"):duration(10):save()
+			schedule.get_event_state("craft").payload = nil
+
+			local first = event:get_payload()
+			local second = event:get_payload()
+			assert(first == second, "Repeated reads should return the same table")
+			assert(schedule.get_event_state("craft").payload == first, "Should store {} back into state")
+		end)
+
+
 		it("Should expose event getters", function()
 			local event = schedule.event("craft")
 				:category("craft")

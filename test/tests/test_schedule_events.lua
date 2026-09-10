@@ -115,6 +115,18 @@ return function()
 		end)
 
 
+		it("Should persist a default payload table when emitting event data from nil state", function()
+			local event = schedule.event("craft"):duration(10):save()
+			schedule.get_event_state("craft").payload = nil
+
+			schedule.update()
+
+			local stored = schedule.get_event_state("craft").payload
+			assert(stored ~= nil, "Emitting event data should write {} back into state")
+			assert(event:get_payload() == stored, "Later reads should reuse the stored table")
+		end)
+
+
 		it("Should keep a false payload in event notifications", function()
 			local received_payload = "unset"
 

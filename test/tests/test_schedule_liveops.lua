@@ -164,5 +164,52 @@ return function()
 			assert(liveops_window == 1, "After a week, exactly one of puzzle/diamond should be active, got " .. liveops_window)
 			assert(schedule.get("fortune"):get_status() == "active", "fortune should stay active")
 		end)
+
+
+		it("Should recover a pending calendar event whose start_time is still in the future", function()
+			declare_calendar()
+
+			local st = schedule.get_event_state("puzzle")
+			st.status = "pending"
+			st.start_time = time + 10 * 365 * DAY
+			st.end_time = nil
+			st.cycle_count = 126
+
+			schedule.update()
+
+			local event = schedule.get("puzzle")
+			assert(event:get_status() == "active", "Should start the current window, got " .. event:get_status())
+			assert(event:get_start_time() == JAN_1 + 252 * DAY,
+				"Should land on the Sep 10 occurrence, got " .. tostring(event:get_start_time()))
+			assert(event:get_end_time() == JAN_1 + 253 * DAY,
+				"Should set end_time for the current window, got " .. tostring(event:get_end_time()))
+			assert(event:get_cycle_count() == 126, "Should be occurrence 126, got " .. event:get_cycle_count())
+		end)
+
+
+		it("Should recover a pending calendar event in a gap without starting a finished window", function()
+			-- Sep 11 12:00 UTC: puzzle gap until Sep 12
+			time = JAN_1 + 253 * DAY + 12 * HOUR
+			declare_calendar()
+
+			local st = schedule.get_event_state("puzzle")
+			st.status = "pending"
+			st.start_time = time + 10 * 365 * DAY
+			st.end_time = nil
+
+			schedule.update()
+
+			assert(schedule.get("puzzle"):get_status() == "pending",
+				"Gap day should stay pending, got " .. schedule.get("puzzle"):get_status())
+			assert(schedule.get("puzzle"):get_start_time() == JAN_1 + 254 * DAY,
+				"Should wait for the Sep 12 occurrence, got " .. tostring(schedule.get("puzzle"):get_start_time()))
+
+			time = JAN_1 + 254 * DAY
+			schedule.update()
+			assert(schedule.get("puzzle"):get_status() == "active",
+				"Should start the next window, got " .. schedule.get("puzzle"):get_status())
+			assert(schedule.get("puzzle"):get_start_time() == JAN_1 + 254 * DAY,
+				"Next window should start on Sep 12, got " .. tostring(schedule.get("puzzle"):get_start_time()))
+		end)
 	end)
 end

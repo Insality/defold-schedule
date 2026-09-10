@@ -75,7 +75,7 @@ end
 ---@param last_update_time number|nil Last update time for wait_online logic
 ---@return boolean should_start True if event should start, false otherwise
 function M.should_start_event(event_id, event_state, current_time, last_update_time)
-	if not M._is_startable_status(event_state.status) then
+	if not M._is_pending(event_state.status) then
 		return false
 	end
 
@@ -483,9 +483,10 @@ end
 ---and never swallows the cycles in between.
 ---@param event_state schedule.event.state
 ---@param current_time number
+---@param from_time number|nil Start from this occurrence instead of the stored next cycle
 ---@return number|nil cycle_time Occurrence that is still running, or the next upcoming one
-function M._resolve_cycle_time(event_state, current_time)
-	local cycle_time = M._get_next_cycle_time(event_state, current_time)
+function M._resolve_cycle_time(event_state, current_time, from_time)
+	local cycle_time = from_time or M._get_next_cycle_time(event_state, current_time)
 	if not cycle_time or cycle_time > current_time then
 		return cycle_time
 	end
@@ -575,7 +576,7 @@ function M.update_event(event_id, current_time, last_update_time)
 		return false
 	end
 
-	if M._is_startable_status(event_state.status) or event_state.status == "paused" then
+	if M._is_pending(event_state.status) or event_state.status == "paused" then
 		if event_state.catch_up and last_update_time then
 			M.process_catchup(event_id, event_state, last_update_time, current_time)
 		end
@@ -598,9 +599,25 @@ function M.update_event(event_id, current_time, last_update_time)
 			end
 		end
 
+		-- Pending waits until `now >= start_time`. A stale future start_time would
+		-- never start. Land on the current or next occurrence from `start_at`, do not
+		-- rewind to the first window: that marks the event completed on restart.
+		if M._is_pending(event_state.status) and event_state.cycle and event_state.start_at
+			and start_time and start_time > current_time then
+			local anchor = time.normalize_time(event_state.start_at)
+			if anchor and start_time > anchor then
+				local occurrence = M._resolve_cycle_time(event_state, current_time, anchor)
+				if occurrence and occurrence ~= start_time then
+					event_state.start_time = occurrence
+					event_state.end_time = M.calculate_end_time(event_state, occurrence)
+					start_time = occurrence
+				end
+			end
+		end
+
 		-- Catch-up (or other earlier work in this call) may have already moved the event
 		-- out of a startable status; only start/cancel when it is still pending
-		if M._is_startable_status(event_state.status) and start_time and current_time >= start_time then
+		if M._is_pending(event_state.status) and start_time and current_time >= start_time then
 			if M._cancel_or_skip_min_time(event_id, event_state, start_time, current_time) then
 				return event_state.status == "active"
 			end
@@ -719,7 +736,7 @@ function M.update_all(current_time)
 	local events_to_update = {}
 	for event_id, event_state in pairs(all_events) do
 		local status = event_state.status
-		if M._is_startable_status(status) or status == "paused" or status == "active" or (status == "completed" and event_state.cycle) then
+		if M._is_pending(status) or status == "paused" or status == "active" or (status == "completed" and event_state.cycle) then
 			events_to_update[event_id] = true
 		end
 	end
@@ -735,7 +752,7 @@ function M.update_all(current_time)
 		all_events,
 		current_time,
 		last_update_time,
-		M._is_startable_status,
+		M._is_pending,
 		M.update_event
 	)
 	any_updated = any_updated or chained_updated
@@ -761,8 +778,19 @@ end
 ---they can only be restarted explicitly with `event:start()`.
 ---@param status string
 ---@return boolean
-function M._is_startable_status(status)
+function M._is_pending(status)
 	return status == "pending"
+end
+
+
+---If payload was never set (legacy save), store `{}` once so later reads share the same table.
+---@param event_state schedule.event.state
+---@return any payload
+function M._normalize_payload(event_state)
+	if event_state.payload == nil then
+		event_state.payload = {}
+	end
+	return event_state.payload
 end
 
 
@@ -771,14 +799,10 @@ end
 ---@param event_state schedule.event.state
 ---@return table event_data
 function M._create_event_data(event_id, event_state)
-	local payload = event_state.payload
-	if payload == nil then
-		payload = {}
-	end
 	return {
 		event_id = event_id,
 		category = event_state.category,
-		payload = payload,
+		payload = M._normalize_payload(event_state),
 		status = event_state.status,
 		start_time = event_state.start_time,
 		end_time = event_state.end_time
