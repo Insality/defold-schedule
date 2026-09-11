@@ -79,6 +79,64 @@ return function()
 		end)
 
 
+		it("Should replay anchor end cycles on the window plus interval grid", function()
+			-- duration 10 + every 100 with anchor "end" puts occurrence starts 110 apart
+			local replayed = {}
+			schedule.on_event:subscribe(function(event)
+				if event.event_id == "raid" and event.callback_type == "start" then
+					table.insert(replayed, event.start_time)
+				end
+				return true
+			end)
+
+			schedule.event("raid")
+				:after(0)
+				:duration(10)
+				:cycle("every", { seconds = 100, anchor = "end" })
+				:catch_up(true)
+				:save()
+
+			schedule.update()
+
+			-- The whole run happens while the game is closed, every missed window is replayed
+			time = 500
+			schedule.update()
+
+			assert(table.concat(replayed, ",") == "0,110,220,330,440",
+				"Replayed occurrences should stay on the anchor end grid, got " .. table.concat(replayed, ","))
+		end)
+
+
+		it("Should keep the anchor end grid when min_time skips a later occurrence", function()
+			local event = schedule.event("raid")
+				:after(0)
+				:duration(10)
+				:cycle("every", { seconds = 100, anchor = "end" })
+				:min_time(5)
+				:save()
+
+			-- Occurrence 0 runs 0..10 and completes, the next one starts at 110
+			time = 0
+			schedule.update()
+			time = 10
+			schedule.update()
+			assert(event:get_status() == "completed", "First occurrence should complete, got " .. event:get_status())
+
+			-- Enter occurrence 1 (110..120) with only 2s left, below min_time, so it is skipped
+			time = 118
+			schedule.update()
+			assert(schedule.get_event_state("raid").next_cycle_time == 220,
+				"Skipping an anchor end occurrence should land on 220, got " ..
+					tostring(schedule.get_event_state("raid").next_cycle_time))
+
+			time = 220
+			schedule.update()
+			assert(event:get_status() == "active", "Should start occurrence 2, got " .. event:get_status())
+			assert(event:get_start_time() == 220,
+				"Occurrence 2 should start at 220, got " .. tostring(event:get_start_time()))
+		end)
+
+
 		it("Should skip missed cycles when skip_missed is true", function()
 			local event = schedule.event()
 				:category("reward")
