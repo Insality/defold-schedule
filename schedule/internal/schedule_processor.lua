@@ -15,6 +15,9 @@ local MAX_CYCLE_STEPS = 512
 ---False until the first update after restore/reset, so `on_enabled` can fire once
 local active_events_ready = false
 
+---True only while the first update after a restore/reset runs, where legacy state is repaired
+local is_cold_start = false
+
 ---How many cycles each event replayed during the current update, so max_catches is a per update limit
 local catchup_counts = {}
 
@@ -612,11 +615,17 @@ end
 ---Pending waits until `now >= start_time`. A stale future start_time would never start.
 ---Land on the current or next occurrence from `start_at`. Do not rewind to the first
 ---window: that marks the event completed on restart.
+---Only restored state can be stale, so this runs once per restore instead of every update:
+---parsing `start_at` for every pending event on every frame is pure waste.
 ---@param event_state schedule.event.state
 ---@param start_time number|nil
 ---@param current_time number
 ---@return number|nil start_time
 function M._align_stale_calendar_start(event_state, start_time, current_time)
+	if not is_cold_start then
+		return start_time
+	end
+
 	if not M._is_pending(event_state.status) or not event_state.cycle or not event_state.start_at then
 		return start_time
 	end
@@ -802,8 +811,8 @@ function M.update_all(current_time)
 	end
 
 	-- Empty ready-flag means this is the first update after a restore/reset
-	local cold_start = not active_events_ready
-	if cold_start then
+	is_cold_start = not active_events_ready
+	if is_cold_start then
 		for event_id, event_state in pairs(all_events) do
 			if event_state.status == "active" then
 				lifecycle.on_enabled(event_id, M._create_event_data(event_id, event_state))
@@ -834,6 +843,7 @@ function M.update_all(current_time)
 		any_updated = chaining.update_chained_events(all_events, current_time, last_update_time, M._is_pending, M.update_event) or any_updated
 	end
 
+	is_cold_start = false
 	active_events_ready = true
 
 	state.set_last_update_time(current_time)
