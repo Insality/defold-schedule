@@ -12,8 +12,6 @@ local M = {}
 ---Safety cap for walking over cycle occurrences, so a broken cycle config can never hang the update loop
 local MAX_CYCLE_STEPS = 512
 
-local active_events = {}
-
 ---False until the first update after restore/reset, so `on_enabled` can fire once
 local active_events_ready = false
 
@@ -21,9 +19,6 @@ local active_events_ready = false
 local catchup_counts = {}
 
 function M.clear_active_events()
-	for event_id in pairs(active_events) do
-		active_events[event_id] = nil
-	end
 	active_events_ready = false
 end
 
@@ -789,23 +784,6 @@ function M.update_event(event_id, current_time, last_update_time)
 end
 
 
----Rebuild the in-memory set of active event ids. Used to fire `on_enabled` after a restore.
----@param all_events table<string, schedule.event.state>
-function M._refresh_active_events(all_events)
-	for event_id in pairs(active_events) do
-		active_events[event_id] = nil
-	end
-
-	for event_id, event_state in pairs(all_events) do
-		if event_state.status == "active" then
-			active_events[event_id] = true
-		end
-	end
-
-	active_events_ready = true
-end
-
-
 ---Update all events
 ---@param current_time number
 function M.update_all(current_time)
@@ -856,9 +834,7 @@ function M.update_all(current_time)
 		any_updated = chaining.update_chained_events(all_events, current_time, last_update_time, M._is_pending, M.update_event) or any_updated
 	end
 
-	if cold_start or any_updated then
-		M._refresh_active_events(all_events)
-	end
+	active_events_ready = true
 
 	state.set_last_update_time(current_time)
 	return any_updated
