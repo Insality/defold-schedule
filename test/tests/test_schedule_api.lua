@@ -91,6 +91,50 @@ return function()
 		end)
 
 
+		it("Should keep registered conditions after reset_state", function()
+			local calls = 0
+			schedule.register_condition("keep_me", function()
+				calls = calls + 1
+				return true
+			end)
+
+			schedule.reset_state()
+			schedule.event("gated"):duration(10):condition("keep_me", {}):save()
+			schedule.update()
+
+			assert(calls == 1, "reset_state should not drop condition evaluators")
+			assert(schedule.get("gated"):get_status() == "active", "Event should start with the kept condition")
+		end)
+
+
+		it("Should default payload to an empty table", function()
+			local event = schedule.event("craft"):duration(10):save()
+
+			assert(event:get_payload() ~= nil, "Payload should not be nil")
+			assert(event:get_payload().missing == nil, "Default payload should be an empty table")
+			assert(schedule.get_event_state("craft").payload ~= nil, "Raw state payload should not be nil")
+		end)
+
+
+		it("Should keep a false payload instead of replacing it with a table", function()
+			local event = schedule.event("craft"):duration(10):payload(false):save()
+
+			assert(event:get_payload() == false, "false payload must not become {}")
+			assert(schedule.get_event_state("craft").payload == false, "Raw state should keep false")
+		end)
+
+
+		it("Should persist a default payload table into legacy nil state", function()
+			local event = schedule.event("craft"):duration(10):save()
+			schedule.get_event_state("craft").payload = nil
+
+			local first = event:get_payload()
+			local second = event:get_payload()
+			assert(first == second, "Repeated reads should return the same table")
+			assert(schedule.get_event_state("craft").payload == first, "Should store {} back into state")
+		end)
+
+
 		it("Should expose event getters", function()
 			local event = schedule.event("craft")
 				:category("craft")
@@ -177,7 +221,7 @@ return function()
 			assert(not pcall(function() schedule.event():cycle("every", {}) end), "cycle every should require seconds")
 			assert(not pcall(function() schedule.event():cycle("weekly", { weekdays = { "someday" } }) end), "weekday should be known")
 			assert(not pcall(function() schedule.event():cycle("weekly", { weekdays = { "sun" }, time = "25:00" }) end), "time should be valid")
-			assert(not pcall(function() schedule.event():duration(10):end_at(100):save() end), "duration and end_at should not be combined")
+			assert(not pcall(function() schedule.event():duration(10, true) end), "duration options should be a table")
 			assert(not pcall(function() schedule.event():infinity():duration(10):save() end), "infinity and duration should not be combined")
 			assert(not pcall(function() schedule.event():start_at(10):after(10):save() end), "start_at and after should not be combined")
 		end)

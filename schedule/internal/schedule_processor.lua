@@ -12,15 +12,17 @@ local M = {}
 ---Safety cap for walking over cycle occurrences, so a broken cycle config can never hang the update loop
 local MAX_CYCLE_STEPS = 512
 
-local active_events = {}
+---False until the first update after restore/reset, so `on_enabled` can fire once
+local active_events_ready = false
+
+---True only during the first update after a restore/reset, where legacy state is repaired
+local is_cold_start = false
 
 ---How many cycles each event replayed during the current update, so max_catches is a per update limit
 local catchup_counts = {}
 
 function M.clear_active_events()
-	for k in pairs(active_events) do
-		active_events[k] = nil
-	end
+	active_events_ready = false
 end
 
 
@@ -49,22 +51,99 @@ function M.calculate_start_time(event_state, current_time, last_update_time)
 end
 
 
----Calculate event end time
+---Join window end: last moment this occurrence may still start.
+---Clip: occurrence + duration, capped by `end_at`. Exceed: next occurrence if cyclic, else `end_at`.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil join_end
+function M.join_end(event_state, occurrence_start)
+	if not occurrence_start or event_state.infinity then
+		return nil
+	end
+
+	local end_at = event_state.end_at and time.normalize_time(event_state.end_at) or nil
+
+	if event_state.exceed_end_time then
+		local slot_end = M._exceed_slot_end(event_state, occurrence_start)
+		if slot_end and end_at then
+			return math.min(slot_end, end_at)
+		end
+		if slot_end or end_at then
+			return slot_end or end_at
+		end
+		if event_state.duration then
+			return occurrence_start + event_state.duration
+		end
+		return nil
+	end
+
+	local duration_end = event_state.duration and (occurrence_start + event_state.duration) or nil
+	if duration_end and end_at then
+		return math.min(duration_end, end_at)
+	end
+	return duration_end or end_at
+end
+
+
+---Slot end for an exceed join window (until the next occurrence, without using join_end).
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil slot_end
+function M._exceed_slot_end(event_state, occurrence_start)
+	local cycle_config = event_state.cycle
+	if not cycle_config then
+		return nil
+	end
+
+	if cycle_config.type == "every" and cycle_config.seconds and cycle_config.seconds > 0 then
+		if cycle_config.anchor == "end" then
+			if event_state.duration then
+				return occurrence_start + event_state.duration
+			end
+			return occurrence_start + cycle_config.seconds
+		end
+		return occurrence_start + cycle_config.seconds
+	end
+
+	return M._following_cycle(event_state, occurrence_start)
+end
+
+
+---Run start and end when this occurrence actually activates.
+---Exceed starts at `now` and always runs `duration` seconds. Clip keeps the occurrence window.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@param current_time number
+---@return number actual_start
+---@return number|nil run_end
+function M._run_times(event_state, occurrence_start, current_time)
+	if event_state.exceed_end_time and event_state.duration then
+		return current_time, current_time + event_state.duration
+	end
+
+	return occurrence_start, M.calculate_end_time(event_state, occurrence_start)
+end
+
+
+---Calculate event run end time (when an already started run finishes).
 ---@param event_state schedule.event.state
 ---@param start_time number
 ---@return number|nil end_time Calculated end time in seconds, or nil for infinity events
 function M.calculate_end_time(event_state, start_time)
-	if event_state.infinity then
+	if event_state.infinity or not start_time then
 		return nil
 	end
 
-	if event_state.end_at then
-		return time.normalize_time(event_state.end_at)
-	elseif event_state.duration then
+	if event_state.exceed_end_time and event_state.duration then
 		return start_time + event_state.duration
 	end
 
-	return nil
+	local duration_end = event_state.duration and (start_time + event_state.duration) or nil
+	local end_at = event_state.end_at and time.normalize_time(event_state.end_at) or nil
+	if duration_end and end_at then
+		return math.min(duration_end, end_at)
+	end
+	return duration_end or end_at
 end
 
 
@@ -75,7 +154,7 @@ end
 ---@param last_update_time number|nil Last update time for wait_online logic
 ---@return boolean should_start True if event should start, false otherwise
 function M.should_start_event(event_id, event_state, current_time, last_update_time)
-	if not M._is_startable_status(event_state.status) then
+	if not M._is_pending(event_state.status) then
 		return false
 	end
 
@@ -88,8 +167,9 @@ function M.should_start_event(event_id, event_state, current_time, last_update_t
 		return false
 	end
 
-	if type(event_state.after) == "string" then
-		local can_start, chain_time = chaining.can_start_chain(event_state.after, event_state, current_time, last_update_time)
+	local after = event_state.after
+	if type(after) == "string" then
+		local can_start, chain_time = chaining.can_start_chain(after, event_state, current_time, last_update_time)
 		if not can_start then
 			return false
 		end
@@ -109,11 +189,6 @@ function M.should_start_event(event_id, event_state, current_time, last_update_t
 		return false
 	end
 
-	if M._is_below_min_time(event_state, start_time, current_time) then
-		event_state.status = "cancelled"
-		return false
-	end
-
 	return true
 end
 
@@ -128,12 +203,38 @@ function M._is_below_min_time(event_state, start_time, current_time)
 		return false
 	end
 
-	local end_time = M.calculate_end_time(event_state, start_time)
+	local end_time = M.join_end(event_state, start_time)
 	if not end_time then
 		return false
 	end
 
 	return (end_time - current_time) <= event_state.min_time
+end
+
+
+---If the remaining window is shorter than min_time, cancel a one-shot event.
+---A cyclic event skips this occurrence instead, the same way later cycles are skipped.
+---@param event_id string
+---@param event_state schedule.event.state
+---@param start_time number
+---@param current_time number
+---@return boolean handled True if the start was rejected (cancelled or skipped)
+function M._cancel_or_skip_min_time(event_id, event_state, start_time, current_time)
+	if not M._is_below_min_time(event_state, start_time, current_time) then
+		return false
+	end
+
+	if not event_state.cycle then
+		event_state.status = "cancelled"
+		return true
+	end
+
+	event_state.status = "completed"
+	event_state.start_time = start_time
+	event_state.end_time = M.join_end(event_state, start_time)
+	event_state.last_update_time = current_time
+	M.process_cycle(event_id, event_state, current_time)
+	return true
 end
 
 
@@ -152,10 +253,11 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 		local start_time = event_state.start_time
 		if start_time and current_time >= start_time then
 			if not event_state.cycle then
-				local end_time = M.calculate_end_time(event_state, start_time)
-				if end_time and current_time >= end_time then
-					-- The whole event happened while offline, replay it as one activation
-					M._replay_event_run(event_id, event_state, start_time, end_time, current_time)
+				local join_end = M.join_end(event_state, start_time)
+				if join_end and current_time >= join_end then
+					-- The whole join window happened while offline, replay it as one activation
+					local run_end = M.calculate_end_time(event_state, start_time) or join_end
+					M._replay_event_run(event_id, event_state, start_time, run_end, current_time)
 					event_state.status = "completed"
 					return true
 				end
@@ -168,9 +270,7 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 						M._apply_catchup_cycle(event_id, event_state, cycle_data.start, cycle_data.end_time, current_time)
 					end
 
-					-- Every replayed cycle already emitted its full lifecycle, so only the
-					-- state is settled here. A cycle that is running right now is picked up
-					-- by the regular cycle processing afterwards
+					-- Replayed cycles emitted their own lifecycle, only the final state is settled here
 					local last_cycle = processed_cycles[#processed_cycles]
 					event_state.status = "completed"
 					event_state.start_time = last_cycle.start
@@ -194,17 +294,63 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 end
 
 
+---Occurrence index on an `every` + `start_at` grid (0 for the first window).
+---Nil when the event has no calendar grid, the caller should then increment.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil index
+function M._occurrence_index(event_state, occurrence_start)
+	local cycle_config = event_state.cycle
+	if not cycle_config or cycle_config.type ~= "every" or not occurrence_start then
+		return nil
+	end
+
+	-- `anchor = "end"` spaces occurrences by duration + seconds, so there is no `start_at` grid
+	if cycle_config.anchor == "end" then
+		return nil
+	end
+
+	local interval = cycle_config.seconds
+	if not interval or interval <= 0 then
+		return nil
+	end
+
+	local anchor = event_state.start_at and time.normalize_time(event_state.start_at) or nil
+	if not anchor then
+		return nil
+	end
+
+	return math.max(0, math.floor((occurrence_start - anchor) / interval + 1e-9))
+end
+
+
+---Set cycle_count to the calendar occurrence index, or increment when there is no grid.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@param increment_if_unknown boolean
+function M._set_cycle_count(event_state, occurrence_start, increment_if_unknown)
+	local index = M._occurrence_index(event_state, occurrence_start)
+	if index then
+		event_state.cycle_count = index
+	elseif increment_if_unknown then
+		event_state.cycle_count = (event_state.cycle_count or 0) + 1
+	end
+end
+
+
 ---Activate a cycle for an event
 ---@param event_id string
 ---@param event_state schedule.event.state
 ---@param new_start_time number
 ---@param new_end_time number|nil
-function M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
+---@param occurrence_start number|nil Grid occurrence this run belongs to
+function M._activate_cycle(event_id, event_state, new_start_time, new_end_time, occurrence_start)
+	occurrence_start = occurrence_start or new_start_time
 	event_state.status = "active"
 	event_state.start_time = new_start_time
 	event_state.end_time = new_end_time
-	event_state.cycle_count = (event_state.cycle_count or 0) + 1
-	event_state.next_cycle_time = nil
+	M._set_cycle_count(event_state, occurrence_start, true)
+	event_state.next_cycle_time = M._following_cycle(event_state, occurrence_start)
 
 	M._update_chained_events(event_id)
 
@@ -222,36 +368,66 @@ end
 ---@return boolean should_skip True if cycle should be skipped
 ---@return number|nil next_cycle_time Next cycle time if skipped
 function M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
-	if not new_end_time or not M._is_below_min_time(event_state, new_start_time, current_time) then
+	local window_ended = new_end_time and current_time >= new_end_time
+	if not window_ended and not M._is_below_min_time(event_state, new_start_time, current_time) then
 		return false, nil
 	end
 
-	local skipped_cycle_time = cycles.calculate_next_cycle(
-		event_state.cycle,
-		current_time,
-		new_end_time,
-		event_state.start_time
-	)
+	-- Stay on the same interval grid as later cycles, do not jump from `now`
+	local skipped_cycle_time = M._next_cycle_after(event_state, new_start_time, current_time)
+	if skipped_cycle_time == new_start_time then
+		skipped_cycle_time = M._following_cycle(event_state, new_start_time)
+	end
 	return true, skipped_cycle_time
+end
+
+
+---How far apart two occurrence starts are for an `every` cycle.
+---`anchor = "end"` waits the interval after the window closes, so its period is the window
+---plus the interval.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil period
+function M._occurrence_period(event_state, occurrence_start)
+	local cycle_config = event_state.cycle
+	local interval = cycle_config and cycle_config.seconds
+	if not interval or interval <= 0 then
+		return nil
+	end
+
+	if cycle_config.anchor ~= "end" then
+		return interval
+	end
+
+	-- No window to wait after, fall back to the plain interval
+	local occurrence_end = M.join_end(event_state, occurrence_start)
+	if not occurrence_end or occurrence_end <= occurrence_start then
+		return interval
+	end
+
+	return interval + (occurrence_end - occurrence_start)
 end
 
 
 ---Get the occurrence right after the given one, without skipping anything in between
 ---@param event_state schedule.event.state
----@param cycle_time number Occurrence to step from
+---@param occurrence_start number Occurrence start to step from
 ---@return number|nil next_cycle_time
-function M._following_cycle(event_state, cycle_time)
+function M._following_cycle(event_state, occurrence_start)
 	local cycle_config = event_state.cycle
-
-	if cycle_config.type == "every" then
-		local interval = cycle_config.seconds
-		if not interval or interval <= 0 then
-			return nil
-		end
-		return cycle_time + interval
+	if not cycle_config then
+		return nil
 	end
 
-	return cycles.calculate_next_cycle(cycle_config, cycle_time + 1, cycle_time, event_state.start_time)
+	if cycle_config.type == "every" then
+		local period = M._occurrence_period(event_state, occurrence_start)
+		if not period then
+			return nil
+		end
+		return occurrence_start + period
+	end
+
+	return cycles.calculate_next_cycle(cycle_config, occurrence_start + 1, occurrence_start, event_state.start_time)
 end
 
 
@@ -289,17 +465,18 @@ function M._collect_finished_cycles(event_state, from_time, current_time, budget
 			break
 		end
 
-		local cycle_end = M.calculate_end_time(event_state, cycle_start)
-		if not cycle_end or cycle_end > current_time then
+		local cycle_join_end = M.join_end(event_state, cycle_start)
+		if not cycle_join_end or cycle_join_end > current_time then
 			break
 		end
 
-		table.insert(finished_cycles, { start = cycle_start, end_time = cycle_end })
-		cycle_start = M._following_cycle(event_state, cycle_start)
+		local occurrence_start = cycle_start
+		local cycle_run_end = M.calculate_end_time(event_state, occurrence_start) or cycle_join_end
+		table.insert(finished_cycles, { start = occurrence_start, end_time = cycle_run_end })
+		cycle_start = M._following_cycle(event_state, occurrence_start)
 	end
 
-	-- Hitting the step limit means the rest of the missed occurrences are dropped and the event
-	-- jumps to the current one. Set max_catches to make that a deliberate number
+	-- At the step limit the remaining missed occurrences are dropped, use max_catches to bound this
 	if #finished_cycles >= MAX_CYCLE_STEPS and cycle_start and cycle_start <= current_time then
 		logger:warn("Catch-up stopped at the step limit, remaining missed cycles are skipped", {
 			collected = #finished_cycles,
@@ -323,13 +500,8 @@ function M._collect_catchup_cycles(event_id, event_state, current_time)
 		return {}, nil
 	end
 
-	local anchor_time = (cycle_config.anchor == "end" and event_state.end_time) or event_state.start_time
-	if not anchor_time then
-		return {}, nil
-	end
-
-	return M._collect_finished_cycles(event_state, M._following_cycle(event_state, anchor_time), current_time,
-		M._get_catchup_budget(event_id, event_state))
+	return M._collect_finished_cycles(event_state, M._following_cycle(event_state, event_state.start_time),
+		current_time, M._get_catchup_budget(event_id, event_state))
 end
 
 
@@ -371,8 +543,8 @@ end
 
 
 ---Get the cycle occurrence to look at, which can be in the past.
----It has to be the occurrence right after the last one, not the next future one: an occurrence
----that started while the game was closed can still be running now.
+---It has to be the one right after the last, not the next future one: an occurrence started
+---while the game was closed can still be running.
 ---@param event_state schedule.event.state
 ---@param current_time number
 ---@return number|nil next_cycle_time
@@ -382,9 +554,13 @@ function M._get_next_cycle_time(event_state, current_time)
 	end
 
 	local cycle_config = event_state.cycle
-	local anchor_time = (cycle_config.anchor == "end" and event_state.end_time) or event_state.start_time
-	if anchor_time then
-		return M._following_cycle(event_state, anchor_time)
+	if not cycle_config then
+		return nil
+	end
+
+	local occurrence_start = event_state.start_time
+	if occurrence_start then
+		return M._following_cycle(event_state, occurrence_start)
 	end
 
 	return cycles.calculate_next_cycle(cycle_config, current_time, event_state.end_time, event_state.start_time)
@@ -393,47 +569,49 @@ end
 
 ---Get the cycle occurrence that follows the given one
 ---@param event_state schedule.event.state
----@param cycle_time number Occurrence to step from
+---@param occurrence_start number Occurrence start to step from
 ---@param current_time number
 ---@return number|nil next_cycle_time
-function M._next_cycle_after(event_state, cycle_time, current_time)
+function M._next_cycle_after(event_state, occurrence_start, current_time)
 	local cycle_config = event_state.cycle
+	if not cycle_config then
+		return nil
+	end
 
 	-- Interval cycles are evenly spaced, so a long offline period is one jump instead of a walk
 	if cycle_config.type == "every" then
-		local interval = cycle_config.seconds
-		if not interval or interval <= 0 then
+		local period = M._occurrence_period(event_state, occurrence_start)
+		if not period then
 			return nil
 		end
 
-		if cycle_time + interval <= current_time then
-			local missed_intervals = math.floor((current_time - cycle_time) / interval)
-			return cycle_time + missed_intervals * interval
+		if occurrence_start + period <= current_time then
+			local missed_periods = math.floor((current_time - occurrence_start) / period)
+			return occurrence_start + missed_periods * period
 		end
 
-		return cycle_time + interval
+		return occurrence_start + period
 	end
 
-	return cycles.calculate_next_cycle(cycle_config, cycle_time + 1, cycle_time, event_state.start_time)
+	return cycles.calculate_next_cycle(cycle_config, occurrence_start + 1, occurrence_start, event_state.start_time)
 end
 
 
 ---Resolve which cycle occurrence the event should be on right now.
----Occurrences that already ended are stepped over, so a single update never activates a stale cycle
----and never swallows the cycles in between.
+---Occurrences that already ended are stepped over, never activated and never swallowed.
 ---@param event_state schedule.event.state
 ---@param current_time number
+---@param from_time number|nil Start from this occurrence instead of the stored next cycle
 ---@return number|nil cycle_time Occurrence that is still running, or the next upcoming one
-function M._resolve_cycle_time(event_state, current_time)
-	local cycle_time = M._get_next_cycle_time(event_state, current_time)
+function M._resolve_cycle_time(event_state, current_time, from_time)
+	local cycle_time = from_time or M._get_next_cycle_time(event_state, current_time)
 	if not cycle_time or cycle_time > current_time then
 		return cycle_time
 	end
 
 	for _ = 1, MAX_CYCLE_STEPS do
-		local cycle_end = M.calculate_end_time(event_state, cycle_time)
+		local cycle_end = M.join_end(event_state, cycle_time)
 		if not cycle_end or cycle_end > current_time then
-			-- This occurrence is still running (or never ends)
 			return cycle_time
 		end
 
@@ -458,26 +636,41 @@ end
 ---@param current_time number
 ---@return boolean processed True if cycle was processed
 function M._process_next_cycle(event_id, event_state, current_time)
-	local next_cycle_time = M._resolve_cycle_time(event_state, current_time)
+	for _ = 1, MAX_CYCLE_STEPS do
+		local next_cycle_time = M._resolve_cycle_time(event_state, current_time)
 
-	if not next_cycle_time or next_cycle_time > current_time then
-		event_state.next_cycle_time = next_cycle_time
-		return false
-	end
-
-	local new_start_time = next_cycle_time
-	local new_end_time = M.calculate_end_time(event_state, new_start_time)
-
-	local should_skip, skipped_cycle_time = M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
-	if should_skip then
-		if skipped_cycle_time then
-			event_state.next_cycle_time = skipped_cycle_time
+		if not next_cycle_time or next_cycle_time > current_time then
+			event_state.next_cycle_time = next_cycle_time
+			if next_cycle_time then
+				event_state.start_time = next_cycle_time
+				event_state.status = "pending"
+			end
+			return false
 		end
-		return false
+
+		local new_start_time = next_cycle_time
+		local new_end_time = M.join_end(event_state, new_start_time)
+
+		local should_skip, skipped_cycle_time = M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
+		if should_skip then
+			event_state.next_cycle_time = skipped_cycle_time
+		else
+			-- Land on this occurrence as pending first. min_time skip of an old window
+			-- must not activate the current one without conditions (LiveOps level gate).
+			event_state.status = "pending"
+			event_state.start_time = new_start_time
+			event_state.end_time = new_end_time
+			if not M.should_start_event(event_id, event_state, current_time, nil) then
+				return false
+			end
+
+			local actual_start, run_end = M._run_times(event_state, new_start_time, current_time)
+			M._activate_cycle(event_id, event_state, actual_start, run_end, new_start_time)
+			return true
+		end
 	end
 
-	M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
-	return true
+	return false
 end
 
 
@@ -502,117 +695,209 @@ function M.process_cycle(event_id, event_state, current_time)
 end
 
 
----Update single event
+---Fill `start_time` from config, chained parent, or a stale calendar start.
+---@param event_state schedule.event.state
+---@param current_time number
+---@param last_update_time number|nil
+---@return number|nil start_time
+function M._ensure_start_time(event_state, current_time, last_update_time)
+	local start_time = event_state.start_time
+	if not start_time then
+		start_time = M.calculate_start_time(event_state, current_time, last_update_time)
+		if start_time then
+			event_state.start_time = start_time
+		end
+	end
+
+	local after = event_state.after
+	if type(after) == "string" then
+		local after_status = state.get_event_state(after)
+		if after_status and chaining.is_chain_parent_ready(after_status, current_time) then
+			if not start_time or start_time < after_status.end_time then
+				start_time = chaining.get_chain_start_time(event_state, after_status, current_time)
+				event_state.start_time = start_time
+			end
+		end
+	end
+
+	return M._align_stale_calendar_start(event_state, start_time, current_time)
+end
+
+
+---Pending waits until `now >= start_time`. A stale future start_time would never start.
+---Land on the current or next occurrence from `start_at`. Do not rewind to the first
+---window: that marks the event completed on restart.
+---Only restored state can be stale, so this runs once per restore, not on every update.
+---@param event_state schedule.event.state
+---@param start_time number|nil
+---@param current_time number
+---@return number|nil start_time
+function M._align_stale_calendar_start(event_state, start_time, current_time)
+	if not is_cold_start then
+		return start_time
+	end
+
+	if not M._is_pending(event_state.status) or not event_state.cycle or not event_state.start_at then
+		return start_time
+	end
+	if not start_time or start_time <= current_time then
+		return start_time
+	end
+
+	local anchor = time.normalize_time(event_state.start_at)
+	if not anchor or start_time <= anchor then
+		return start_time
+	end
+
+	local occurrence = M._resolve_cycle_time(event_state, current_time, anchor)
+	if occurrence and occurrence ~= start_time then
+		event_state.start_time = occurrence
+		event_state.end_time = M.join_end(event_state, occurrence)
+		return occurrence
+	end
+
+	return start_time
+end
+
+
+---The window already ended before this update. Replay it when catch_up is on,
+---otherwise close it silently (LiveOps) and let the cycle path move forward.
+---@param event_id string
+---@param event_state schedule.event.state
+---@param start_time number
+---@param end_time number
+---@param current_time number
+function M._close_elapsed_start(event_id, event_state, start_time, end_time, current_time)
+	if event_state.catch_up then
+		M._replay_event_run(event_id, event_state, start_time, end_time, current_time)
+	else
+		event_state.start_time = start_time
+		event_state.end_time = end_time
+		event_state.last_update_time = current_time
+	end
+	event_state.status = "completed"
+	M.process_cycle(event_id, event_state, current_time)
+end
+
+
+---Start a pending event whose start_time is due, or close it if the window already ended.
+---@param event_id string
+---@param event_state schedule.event.state
+---@param start_time number
+---@param current_time number
+---@return boolean started
+function M._open_or_close_window(event_id, event_state, start_time, current_time)
+	local join_end = M.join_end(event_state, start_time)
+
+	if join_end and current_time >= join_end then
+		M._close_elapsed_start(event_id, event_state, start_time, join_end, current_time)
+		return true
+	end
+
+	local actual_start, run_end = M._run_times(event_state, start_time, current_time)
+	M._activate_event(event_id, event_state, actual_start, run_end, current_time, start_time)
+
+	-- A chained event with no duration is a trigger: fire and complete in the same update
+	if not run_end and not event_state.infinity and event_state.after and not event_state.start_at then
+		M._complete_event(event_id, event_state, actual_start, run_end, current_time)
+		M.process_cycle(event_id, event_state, current_time)
+	end
+
+	return true
+end
+
+
+---Catch up, resolve start, then start if the event is still pending and due.
+---Paused events only resolve start_time here.
+---@param event_id string
+---@param event_state schedule.event.state
+---@param current_time number
+---@param last_update_time number|nil
+---@return boolean handled True if this update already finished the event
+function M._step_pending(event_id, event_state, current_time, last_update_time)
+	local status = event_state.status
+	if not M._is_pending(status) and status ~= "paused" then
+		return false
+	end
+
+	if event_state.catch_up and last_update_time then
+		M.process_catchup(event_id, event_state, last_update_time, current_time)
+	end
+
+	local start_time = M._ensure_start_time(event_state, current_time, last_update_time)
+
+	-- Catch-up may have already moved the event out of pending
+	if not M._is_pending(event_state.status) or not start_time or current_time < start_time then
+		return false
+	end
+
+	if M._cancel_or_skip_min_time(event_id, event_state, start_time, current_time) then
+		return true
+	end
+
+	if not M.should_start_event(event_id, event_state, current_time, last_update_time) then
+		return false
+	end
+
+	return M._open_or_close_window(event_id, event_state, start_time, current_time)
+end
+
+
+---Complete an active event that has reached its end, including offline catch-up.
+---@param event_id string
+---@param event_state schedule.event.state
+---@param current_time number
+---@param last_update_time number|nil
+---@return boolean handled
+function M._step_active(event_id, event_state, current_time, last_update_time)
+	if event_state.status ~= "active" then
+		return false
+	end
+
+	if event_state.catch_up and last_update_time then
+		if M.process_catchup(event_id, event_state, last_update_time, current_time) then
+			M.process_cycle(event_id, event_state, current_time)
+			return true
+		end
+		return false
+	end
+
+	local end_time = event_state.end_time
+	if end_time and current_time >= end_time then
+		M._complete_event(event_id, event_state, nil, end_time, current_time)
+		M.process_cycle(event_id, event_state, current_time)
+		return true
+	end
+
+	return false
+end
+
+
+---Update a single event: start, end, then advance cycles.
 ---@param event_id string
 ---@param current_time number
 ---@param last_update_time number|nil
 ---@return boolean event_updated True if event was updated, false otherwise
 function M.update_event(event_id, current_time, last_update_time)
 	local event_state = state.get_event_state(event_id)
-
 	if not event_state then
 		return false
 	end
 
-	if M._is_startable_status(event_state.status) or event_state.status == "paused" then
-		if event_state.catch_up and last_update_time then
-			M.process_catchup(event_id, event_state, last_update_time, current_time)
-		end
-
-		local start_time = event_state.start_time
-		if not start_time then
-			start_time = M.calculate_start_time(event_state, current_time, last_update_time)
-			if start_time then
-				event_state.start_time = start_time
-			end
-		end
-
-		if type(event_state.after) == "string" then
-			local after_status = state.get_event_state(event_state.after)
-			if after_status and after_status.status == "completed" and after_status.end_time then
-				if not start_time or start_time < after_status.end_time then
-					start_time = chaining.get_chain_start_time(event_state, after_status, current_time)
-					event_state.start_time = start_time
-				end
-			end
-		end
-
-		-- Catch-up (or other earlier work in this call) may have already moved the event
-		-- out of a startable status; only start/cancel when it is still pending
-		if M._is_startable_status(event_state.status) and start_time and current_time >= start_time then
-			if M._is_below_min_time(event_state, start_time, current_time) then
-				event_state.status = "cancelled"
-				return false
-			end
-
-			local should_start = M.should_start_event(event_id, event_state, current_time, last_update_time)
-			if should_start then
-				local end_time = M.calculate_end_time(event_state, start_time)
-
-				-- The event ran out while the game was closed. Emit the whole lifecycle at once
-				-- instead of reporting a window that is already over as active
-				if end_time and current_time >= end_time then
-					M._replay_event_run(event_id, event_state, start_time, end_time, current_time)
-					event_state.status = "completed"
-
-					if event_state.cycle then
-						M.process_cycle(event_id, event_state, current_time)
-					end
-
-					return true
-				end
-
-				M._activate_event(event_id, event_state, start_time, end_time, current_time)
-
-				if not end_time and not event_state.infinity and event_state.after and not event_state.start_at then
-					M._complete_event(event_id, event_state, start_time, end_time, current_time)
-
-					if event_state.cycle then
-						M.process_cycle(event_id, event_state, current_time)
-					end
-
-					return true
-				end
-
-				return true
-			end
-		end
+	if M._step_pending(event_id, event_state, current_time, last_update_time) then
+		return true
 	end
 
-	if event_state.status == "active" then
-		if not event_state.catch_up or not last_update_time then
-			local end_time = event_state.end_time
-			if end_time and current_time >= end_time then
-				M._complete_event(event_id, event_state, nil, end_time, current_time)
-
-				if event_state.cycle then
-					M.process_cycle(event_id, event_state, current_time)
-				end
-
-				return true
-			end
-		else
-			if M.process_catchup(event_id, event_state, last_update_time, current_time) then
-				if event_state.cycle then
-					local cycle_processed = M.process_cycle(event_id, event_state, current_time)
-					if cycle_processed then
-						return true
-					end
-				end
-				return true
-			end
-		end
+	if M._step_active(event_id, event_state, current_time, last_update_time) then
+		return true
 	end
 
 	if event_state.status == "paused" then
 		return false
 	end
 
-	if event_state.status == "completed" and event_state.cycle then
-		local cycle_processed = M.process_cycle(event_id, event_state, current_time)
-		if cycle_processed then
-			return true
-		end
+	if event_state.status == "completed" and M.process_cycle(event_id, event_state, current_time) then
+		return true
 	end
 
 	event_state.last_update_time = current_time
@@ -637,11 +922,11 @@ function M.update_all(current_time)
 		last_update_time = nil
 	end
 
-	if next(active_events) == nil then
+	is_cold_start = not active_events_ready
+	if is_cold_start then
 		for event_id, event_state in pairs(all_events) do
 			if event_state.status == "active" then
-				local event_data = M._create_event_data(event_id, event_state)
-				lifecycle.on_enabled(event_id, event_data)
+				lifecycle.on_enabled(event_id, M._create_event_data(event_id, event_state))
 			end
 		end
 	end
@@ -650,53 +935,50 @@ function M.update_all(current_time)
 		catchup_counts[event_id] = nil
 	end
 
-	local events_to_update = {}
+	local has_chained_events = false
 	for event_id, event_state in pairs(all_events) do
+		if type(event_state.after) == "string" then
+			has_chained_events = true
+		end
+
 		local status = event_state.status
-		if M._is_startable_status(status) or status == "paused" or status == "active" or (status == "completed" and event_state.cycle) then
-			events_to_update[event_id] = true
+		if M._is_pending(status) or status == "paused" or status == "active"
+			or (status == "completed" and event_state.cycle) then
+			if M.update_event(event_id, current_time, last_update_time) then
+				any_updated = true
+			end
 		end
 	end
 
-	for event_id, _ in pairs(events_to_update) do
-		local updated = M.update_event(event_id, current_time, last_update_time)
-		if updated then
-			any_updated = true
-		end
+	if has_chained_events then
+		any_updated = chaining.update_chained_events(all_events, current_time, last_update_time, M._is_pending, M.update_event) or any_updated
 	end
 
-	local chained_updated = chaining.update_chained_events(
-		all_events,
-		current_time,
-		last_update_time,
-		M._is_startable_status,
-		M.update_event
-	)
-	any_updated = any_updated or chained_updated
-
-	for k in pairs(active_events) do
-		active_events[k] = nil
-	end
-
-	all_events = state.get_all_events()
-	for event_id, event_state in pairs(all_events) do
-		if event_state.status == "active" then
-			active_events[event_id] = true
-		end
-	end
+	is_cold_start = false
+	active_events_ready = true
 
 	state.set_last_update_time(current_time)
 	return any_updated
 end
 
 
----Check if event status allows starting.
----"cancelled", "aborted" and "failed" are terminal: the update loop never revives them,
----they can only be restarted explicitly with `event:start()`.
+---Check if event status allows starting. "cancelled", "aborted" and "failed" are terminal:
+---the update loop never revives them, only an explicit `event:start()` does.
 ---@param status string
 ---@return boolean
-function M._is_startable_status(status)
+function M._is_pending(status)
 	return status == "pending"
+end
+
+
+---If payload was never set (legacy save), store `{}` once so later reads share the same table.
+---@param event_state schedule.event.state
+---@return any payload
+function M._normalize_payload(event_state)
+	if event_state.payload == nil then
+		event_state.payload = {}
+	end
+	return event_state.payload
 end
 
 
@@ -708,7 +990,7 @@ function M._create_event_data(event_id, event_state)
 	return {
 		event_id = event_id,
 		category = event_state.category,
-		payload = event_state.payload,
+		payload = M._normalize_payload(event_state),
 		status = event_state.status,
 		start_time = event_state.start_time,
 		end_time = event_state.end_time
@@ -722,11 +1004,19 @@ end
 ---@param start_time number
 ---@param end_time number|nil
 ---@param current_time number
-function M._activate_event(event_id, event_state, start_time, end_time, current_time)
+---@param occurrence_start number|nil Grid occurrence this run belongs to
+function M._activate_event(event_id, event_state, start_time, end_time, current_time, occurrence_start)
+	occurrence_start = occurrence_start or start_time
+	local increment = event_state.cycle and event_state.end_time and occurrence_start > event_state.end_time
 	event_state.status = "active"
 	event_state.start_time = start_time
 	event_state.end_time = end_time
 	event_state.last_update_time = current_time
+	M._set_cycle_count(event_state, occurrence_start, increment)
+	if event_state.cycle then
+		event_state.next_cycle_time = M._following_cycle(event_state, occurrence_start)
+	end
+	M._update_chained_events(event_id)
 
 	local event_data = M._create_event_data(event_id, event_state)
 	lifecycle.on_start(event_id, event_data)
@@ -783,7 +1073,6 @@ function M._collect_missed_cycles(event_id, event_state, start_time, current_tim
 	local cycles_list = M._collect_finished_cycles(event_state, start_time, current_time,
 		M._get_catchup_budget(event_id, event_state))
 
-	-- Only the last missed occurrence is replayed when the game asked to skip the ones in between
 	if skip_missed and #cycles_list > 1 then
 		cycles_list = { cycles_list[#cycles_list] }
 	end
@@ -821,7 +1110,7 @@ end
 ---@param current_time number
 function M._apply_catchup_cycle(event_id, event_state, cycle_start, cycle_end, current_time)
 	catchup_counts[event_id] = (catchup_counts[event_id] or 0) + 1
-	event_state.cycle_count = (event_state.cycle_count or 0) + 1
+	M._set_cycle_count(event_state, cycle_start, true)
 	M._replay_event_run(event_id, event_state, cycle_start, cycle_end, current_time)
 end
 

@@ -9,7 +9,7 @@ local queue = require("event.queue")
 ---@field callback_type schedule.lifecycle.event
 ---@field event_id string
 ---@field category string
----@field payload any
+---@field payload any Custom data, `{}` when omitted
 ---@field status string
 ---@field start_time number
 ---@field end_time number

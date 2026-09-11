@@ -147,10 +147,10 @@ function M:get_progress()
 end
 
 
----Get event payload
+---Get event payload. When none was set, stores and returns `{}`. Otherwise returns the value passed to `:payload()`.
 ---@return any payload Event payload data
 function M:get_payload()
-	return self.state.payload
+	return processor._normalize_payload(self.state)
 end
 
 
@@ -175,8 +175,12 @@ function M:get_end_time()
 end
 
 
----Get how many times the event has been activated by its cycle
----@return number cycle_count Number of completed cycle activations, 0 for the first run
+---Get how many times the event has been activated by its cycle.
+---With `start_at` + `every` (default `anchor = "start"`), this is the occurrence index on the calendar
+---grid (0 for the first window), including occurrences skipped by `min_time` or `skip_missed`.
+---Otherwise this is how many times the cycle actually started: 0 on the first run, then 1, 2, ...
+---`anchor = "end"` spaces occurrences by duration + seconds, so it counts starts even with `start_at`.
+---@return number cycle_count Calendar index with `start_at` + `every`; otherwise actual cycle starts, 0 for the first run
 function M:get_cycle_count()
 	return self.state.cycle_count or 0
 end
@@ -248,7 +252,9 @@ function M:start()
 	end
 
 	local current_time = time.get_time()
-	if not event_state.start_time then
+	local occurrence_start = event_state.start_time
+	if not occurrence_start then
+		occurrence_start = current_time
 		event_state.start_time = current_time
 	end
 
@@ -257,8 +263,12 @@ function M:start()
 	if event_state.infinity then
 		event_state.end_time = nil
 	else
-		local end_time = processor.calculate_end_time(event_state, event_state.start_time)
-		event_state.end_time = end_time
+		local actual_start, run_end = processor._run_times(event_state, occurrence_start, current_time)
+		event_state.start_time = actual_start
+		event_state.end_time = run_end
+	end
+	if event_state.cycle then
+		event_state.next_cycle_time = processor._following_cycle(event_state, occurrence_start)
 	end
 
 	self.state = event_state
@@ -334,7 +344,7 @@ end
 
 ---Resume this paused event. Sets status back to "active".
 ---Only works on paused events.
----For events with duration (not end_at), extends end_time by the pause duration.
+---For events with relative duration and no `end_at`, extends end_time by the pause duration.
 ---@return boolean success True if event was resumed
 function M:resume()
 	local event_id = self.state.event_id
@@ -354,7 +364,6 @@ function M:resume()
 	local current_time = time.get_time()
 	local pause_start_time = event_state.last_update_time
 
-	-- Calculate pause duration
 	local pause_duration = 0
 	if pause_start_time then
 		pause_duration = current_time - pause_start_time

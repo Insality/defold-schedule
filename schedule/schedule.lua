@@ -55,7 +55,8 @@ M.WEEK = 604800
 ---Use it for cross-cutting concerns (logging, analytics), use lifecycle callbacks for event-specific logic.
 ---Callback: `fun(event: table): boolean|nil`. Return `true` to mark the event as handled and drop it from
 ---the queue, return `nil` to leave it for other subscribers. Note that returning `false` also marks it handled.
----Event table contains: `callback_type`, `event_id`, `category`, `payload`, `status`, `start_time`, `end_time`
+---Event table contains: `callback_type`, `event_id`, `category`, `payload`, `status`, `start_time`, `end_time`.
+---When omitted, `payload` is `{}`; a value passed to `:payload()` is kept as-is.
 ---`callback_type` is one of `"start"`, `"enabled"`, `"disabled"`, `"end"`, `"fail"`
 ---@class schedule.queue.on_event: queue
 ---@field push fun(_, event: table)
@@ -64,13 +65,12 @@ M.WEEK = 604800
 M.on_event = lifecycle.event_queue
 
 
----Reset all schedule state. Clears all events, callbacks, conditions, subscriptions and time tracking.
----The custom time function set with `set_time_function()` is kept, it is a system setting and not game state.
----Use for testing or implementing a "reset game" feature.
+---Reset saved events, callbacks, subscriptions and time tracking.
+---Registered condition evaluators and the custom time function stay: they are system
+---settings, not game state. Use for testing or a "reset game" feature.
 function M.reset_state()
 	state.reset()
 	lifecycle.reset_callbacks()
-	conditions.reset()
 	processor.clear_active_events()
 end
 
@@ -86,7 +86,8 @@ end
 ---Restore schedule state from serialization. Call immediately after loading saved game data,
 ---before declaring your events. Restores all events to their previous state, the next `update()` catches up
 ---the time that passed since the state was saved. Lifecycle callbacks are not serializable: re-declare your
----events with `schedule.event(id)` after restoring to attach them again, it keeps the stored timings.
+---events with `schedule.event(id)` after restoring to attach them again, it keeps the stored timings
+---(including `start_at` occurrences). To change the calendar window, `remove()` the event and create it again.
 ---@param new_state schedule.state State object previously obtained from `get_state()`
 function M.set_state(new_state)
 	state.set_state(new_state)
@@ -120,6 +121,7 @@ end
 ---Get the raw event state table by ID. Use for direct state access.
 ---The returned table is the live internal state, changing it changes the event.
 ---Prefer `get()` unless you specifically need raw state access.
+---New events store `payload` as `{}` when omitted. A value passed to `:payload()` is kept as-is.
 ---@param event_id string The event ID to query
 ---@return schedule.event.state|nil event_state Raw event state table, or nil if event doesn't exist
 function M.get_event_state(event_id)

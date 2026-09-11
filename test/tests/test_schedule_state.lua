@@ -40,6 +40,44 @@ return function()
 		end)
 
 
+		it("Should keep start_at occurrence times when an event is re-declared", function()
+			local jan_1 = 1767225600
+			time = jan_1 + 252 * schedule.DAY + 12 * schedule.HOUR
+
+			schedule.event("puzzle")
+				:category("liveops")
+				:start_at("2026-01-01T00:00:00")
+				:duration(schedule.DAY)
+				:cycle("every", { seconds = 2 * schedule.DAY })
+				:save()
+
+			schedule.update()
+			local before = schedule.get_event_state("puzzle")
+			assert(before.status == "active", "Event should be on the current occurrence")
+			local start_before = before.start_time
+			local end_before = before.end_time
+			assert(start_before == jan_1 + 252 * schedule.DAY,
+				"Should be on the Sep 10 occurrence, got " .. tostring(start_before))
+
+			local state = deep_copy_state(schedule.get_state())
+			schedule.reset_state()
+			schedule_time.set_time_function(function() return time end)
+			schedule.set_state(state)
+			schedule.event("puzzle")
+				:category("liveops")
+				:start_at("2026-01-01T00:00:00")
+				:duration(schedule.DAY)
+				:cycle("every", { seconds = 2 * schedule.DAY })
+				:save()
+
+			local after = schedule.get_event_state("puzzle")
+			assert(after.start_time == start_before,
+				"Re-declaring with start_at should keep the stored start_time, got " .. tostring(after.start_time))
+			assert(after.end_time == end_before,
+				"Re-declaring with start_at should keep the stored end_time, got " .. tostring(after.end_time))
+		end)
+
+
 		it("Should keep the start time when an event is re-declared on game start", function()
 			schedule.event("craft_sword")
 				:category("craft")
@@ -325,7 +363,7 @@ return function()
 
 			time = 10
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should be completed")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			-- Second cycle runs from 20 to 30
 			time = 25

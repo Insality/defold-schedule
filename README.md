@@ -50,10 +50,10 @@ Open your `game.project` file and add the following line to the dependencies fie
 https://github.com/Insality/defold-event/archive/refs/tags/20.zip
 ```
 
-**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/2.zip)**
+**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/3.zip)**
 
 ```
-https://github.com/Insality/defold-schedule/archive/refs/tags/2.zip
+https://github.com/Insality/defold-schedule/archive/refs/tags/3.zip
 ```
 
 
@@ -144,11 +144,12 @@ schedule.event()
 	:after(time)
 	:start_at(time) -- Unix seconds or ISO (YYYY-MM-DDTHH:MM:SS)
 	-- Note: Weekly and yearly cycles can work without start_at - they compute next occurrence from now
-	-- When to end, choose one of the following
+	-- When to end: duration, end_at, both (clip), or infinity
 	:duration(time)
+	:duration(time, { exceed_end_time = true }) -- run N seconds from join; may pass the join window
 	:end_at(time)
 	:infinity() -- Works until manual cancellation
-	:min_time(time) -- Do not start if not enough time left
+	:min_time(time) -- Do not start if the join window leftover is too short; cyclic events skip to the next occurrence
 	-- Conditions
 	:condition(condition_name, data)
 	:abort_on_fail() -- Abort event when conditions fail
@@ -157,7 +158,7 @@ schedule.event()
 	:cycle("weekly", { weekdays = {"sun"}, time = "HH:MM", skip_missed = true })
 	:cycle("monthly", { day = 1..31, time = "HH:MM", skip_missed = true })
 	:cycle("yearly", { month = 1..12, day = 1..31, time = "HH:MM", skip_missed = true })
-	:catch_up(true|false) -- Replay occurrences missed while offline. Default: false with a duration, true without
+	:catch_up(true|false) -- Replay a fully missed window / missed cycles. Default: false with a duration, true without
 	-- Lifecycle callbacks, all receive { event_id, category, payload, status, start_time, end_time }
 	:on_start(callback) -- Event activated
 	:on_enabled(callback) -- Event became active, also on state restore and on catch-up
@@ -170,8 +171,11 @@ schedule.event()
 
 Statuses: an event goes `pending` to `active` to `completed`. `cancelled` and `aborted` are terminal,
 the update loop never revives them, use `event:start()` to run such an event anyway.
+Re-declaring an event with the same id keeps the stored `start_time` / `end_time` of the current
+occurrence, even when `start_at` is set. To change the calendar, `remove()` it and create it again.
 
 For detailed API documentation, please refer to:
+- [Timing: join window, run, clip, exceed](api/timing.md)
 - [API Reference](api/schedule_api.md)
 - [Event Builder API](api/schedule_event_builder.md)
 - [Event API](api/schedule_event.md)
@@ -191,7 +195,8 @@ function init(self)
 	saver.bind_save_state("schedule", schedule.get_state())
 
 	-- Declare your events after the state is restored.
-	-- Re-declaring an event with the same id keeps its stored timings and re-attaches the callbacks
+	-- Re-declaring an event with the same id keeps its stored timings (including start_at
+	-- occurrences) and re-attaches the callbacks
 	schedule.event("craft_sword")
 		:category("craft")
 		:after(schedule.HOUR)
@@ -215,9 +220,35 @@ Completed one-shot events stay in the state until you remove them. Drop the ones
 
 Read the [Use Cases](USE_CASES.md) file for worked examples: crafting timers and building queues,
 cooldowns, energy regeneration, LiveOps windows, daily rewards, offers with conditions and event chaining.
+Join window vs run, clip vs exceed: [timing](api/timing.md).
 
 It starts with the two ways to use the schedule - **pull** (keep the event id and query it) and
 **push** (attach callbacks and let the schedule call you) - and when to pick which.
+
+
+## Changelog
+
+<details>
+
+### **V1**
+- Initial Release
+
+### **V2**
+- Tests, refactor, docs, annotations
+
+### **V3**
+- Cyclic `min_time` skips the occurrence instead of cancelling the event
+- Re-declaring an event with `start_at` keeps the stored occurrence timings
+- `catch_up(false)` does not replay a fully missed window
+- Default `payload` to `{}`; a legacy nil payload is written back into state once
+- Cyclic `start_at` + `every` (anchor `start`) uses the calendar occurrence as `cycle_count`
+- Pending cyclic `start_at` lands a stale future `start_time` on the current or next occurrence
+- `duration` + `end_at` clip to `min(start + duration, end_at)`
+- `:duration(n, { exceed_end_time = true })`: join the slot / until `end_at`, run `n` seconds from join
+- After an exceed run, the next open slot starts when free (it is not burned)
+- `skip_missed` jumps to the current or next window; it does not activate missed occurrences
+
+</details>
 
 
 ## License

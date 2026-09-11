@@ -99,7 +99,9 @@ end
 
 
 ---Set event to end at an absolute time (calendar-based end date). Use for fixed-date events like LiveOps.
----Use `duration()` for relative durations calculated from start time.
+---Can be combined with `duration()`: clip (default) ends at `min(start + duration, end_at)`;
+---with `exceed_end_time` the join window ends at `end_at` and the run can pass it.
+---See `api/timing.md`.
 ---@param end_at number|string Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
 ---@return schedule.event_builder Self for method chaining
 function M:end_at(end_at)
@@ -110,14 +112,22 @@ function M:end_at(end_at)
 end
 
 
----Set the event duration. Use for crafting timers, cooldowns, temporary buffs, or any relative-duration event.
----End time is calculated as start_time + duration. For recurring events, each cycle uses the same duration.
+---Set the event duration. Clip (default): join and run are `[occurrence, occurrence + duration)`
+---(capped by `end_at` when both are set); late join is leftover. Exceed:
+---`:duration(n, { exceed_end_time = true })` starts at `now` and runs `n` seconds, and may pass
+---the join window (`end_at` or the next cycle occurrence). See `api/timing.md`.
 ---@param duration number Duration in seconds (use `schedule.HOUR`, `schedule.DAY`, etc. for clarity)
+---@param options table|nil Options table with `exceed_end_time` (boolean)
 ---@return schedule.event_builder Self for method chaining
-function M:duration(duration)
+function M:duration(duration, options)
 	assert(type(duration) == "number" and duration >= 0, "Event duration should be a positive number of seconds")
+	assert(options == nil or type(options) == "table", "Event duration options should be a table")
 
 	self.config.duration = duration
+	if options and options.exceed_end_time ~= nil then
+		assert(type(options.exceed_end_time) == "boolean", "Event exceed_end_time should be a boolean")
+		self.config.exceed_end_time = options.exceed_end_time
+	end
 	return self
 end
 
@@ -200,6 +210,7 @@ end
 
 
 ---Set custom data payload passed to event handlers and callbacks. Included in all event notifications.
+---When omitted, `payload` is `{}`. A value passed to `:payload()` is kept as-is and is not coerced to a table.
 ---Store lightweight data (IDs, configuration objects). Avoid large objects or functions.
 ---@param payload any Custom data object to attach to the event
 ---@return schedule.event_builder Self for method chaining
@@ -211,7 +222,9 @@ end
 
 ---Set whether the event should catch up on missed time when the game resumes after being offline.
 ---Enable for offline progression (crafting, daily rewards). Disable for LiveOps or time-sensitive events.
----Events with duration default to `false`; events without duration default to `true`.
+---When false, a fully missed window is marked `completed` without emitting start/enabled/end/disabled.
+---When true, that missed run is replayed. Cycles also replay missed occurrences only when this is true
+---(and `skip_missed` is not set). Events with duration default to `false`; events without duration default to `true`.
 ---@param catch_up boolean true to enable offline catch-up, false to disable
 ---@return schedule.event_builder Self for method chaining
 function M:catch_up(catch_up)
@@ -222,7 +235,9 @@ function M:catch_up(catch_up)
 end
 
 
----Set the minimum time remaining required for the event to start. If less time remains, the event is cancelled.
+---Set the minimum time remaining in the **join window** required for the event to start.
+---If less time remains, a one-shot event is cancelled; a cyclic event skips this occurrence
+---and waits for the next one, the same way later cycles are skipped.
 ---Use for LiveOps events or limited-time offers to prevent wasted activations.
 ---@param min_time number Minimum seconds remaining required to start (use `schedule.DAY`, etc.)
 ---@return schedule.event_builder Self for method chaining
@@ -316,14 +331,14 @@ local CALENDAR_CYCLES = {
 ---@param existing_start_time number|nil Existing start time to preserve (nil for new events)
 ---@return number|nil calculated_start_time
 function M._calculate_start_time(config, current_time, existing_start_time)
-	if config.start_at then
-		return time.normalize_time(config.start_at)
-	end
-
-	-- A persisted start time always wins, otherwise re-declaring an event on game start
-	-- would push its timer forward on every launch
+	-- A persisted start time always wins, including when `start_at` is set: re-declaring
+	-- an event on game start must keep the current occurrence, not the calendar anchor
 	if existing_start_time then
 		return existing_start_time
+	end
+
+	if config.start_at then
+		return time.normalize_time(config.start_at)
 	end
 
 	if config.after then
@@ -348,12 +363,21 @@ end
 ---@param existing_end_time number|nil Existing end time to preserve (nil for new events)
 ---@return number|nil calculated_end_time
 function M._calculate_end_time(config, start_time, existing_end_time)
-	if config.end_at then
-		return time.normalize_time(config.end_at)
-	elseif config.duration and start_time then
+	-- Keep the stored window of a running occurrence across re-declaration
+	if existing_end_time then
+		return existing_end_time
+	end
+
+	if config.exceed_end_time and config.duration and start_time then
 		return start_time + config.duration
 	end
-	return existing_end_time
+
+	local duration_end = config.duration and start_time and (start_time + config.duration) or nil
+	local end_at = config.end_at and time.normalize_time(config.end_at) or nil
+	if duration_end and end_at then
+		return math.min(duration_end, end_at)
+	end
+	return duration_end or end_at
 end
 
 
@@ -402,6 +426,10 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 	-- A new event always starts pending. The first update() activates it, so conditions,
 	-- min_time and the start callbacks are applied the same way for every event
 	local initial_status = existing_state and (existing_state.status or "pending") or "pending"
+	local payload = merge_value(config.payload, existing_state and existing_state.payload)
+	if payload == nil then
+		payload = {}
+	end
 
 	return {
 		event_id = event_id,
@@ -412,12 +440,13 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 		cycle_count = existing_state and (existing_state.cycle_count or 0) or 0,
 		next_cycle_time = existing_state and existing_state.next_cycle_time or nil,
 		category = merge_value(config.category, existing_state and existing_state.category),
-		payload = merge_value(config.payload, existing_state and existing_state.payload),
+		payload = payload,
 		after = merge_value(config.after, existing_state and existing_state.after),
 		after_options = merge_value(config.after_options, existing_state and existing_state.after_options),
 		start_at = merge_value(config.start_at, existing_state and existing_state.start_at),
 		end_at = merge_value(config.end_at, existing_state and existing_state.end_at),
 		duration = merge_value(config.duration, existing_state and existing_state.duration),
+		exceed_end_time = merge_value(config.exceed_end_time, existing_state and existing_state.exceed_end_time),
 		infinity = merge_value(config.infinity, existing_state and existing_state.infinity),
 		cycle = merge_value(config.cycle, existing_state and existing_state.cycle),
 		conditions = merge_value(config.conditions, existing_state and existing_state.conditions),
@@ -432,7 +461,8 @@ end
 ---@param config table Builder config
 function M._validate_config(config)
 	assert(config.event_id == nil or type(config.event_id) == "string", "Event id should be a string")
-	assert(not (config.duration and config.end_at), "Event can not have both duration() and end_at(), pick one")
+	assert(not (config.exceed_end_time and config.duration == nil),
+		"Event exceed_end_time requires duration()")
 	assert(not (config.infinity and (config.duration or config.end_at)),
 		"Event can not be infinity() and have duration() or end_at() at the same time")
 	assert(not (config.start_at and config.after), "Event can not have both start_at() and after(), pick one")
@@ -447,7 +477,9 @@ end
 
 ---Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 ---Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
----and callbacks are registered. If an existing event with the same ID exists, its state is merged.
+---and callbacks are registered. If an existing event with the same ID exists, its state is merged:
+---stored `start_time` / `end_time` of the current occurrence are kept, even when `start_at` is set.
+---To change the calendar window, `schedule.remove(id)` and create the event again.
 ---Returns the created event object, with methods like `get_time_left()` and `get_status()`.
 ---@return schedule.event event Created event instance
 function M:save()

@@ -27,6 +27,23 @@ function M.get_chain_start_time(event_state, after_status, current_time)
 end
 
 
+---Parent occurrence has ended. Cyclic events waiting for the next window are pending, not completed.
+---@param after_status schedule.event.state
+---@param current_time number
+---@return boolean
+function M.is_chain_parent_ready(after_status, current_time)
+	if not after_status.end_time or current_time < after_status.end_time then
+		return false
+	end
+
+	if after_status.status == "completed" then
+		return true
+	end
+
+	return after_status.status == "pending" and after_status.cycle and after_status.start_time and after_status.start_time > current_time
+end
+
+
 ---Check if event can start based on chaining
 ---@param after_event_id string Event ID to chain after
 ---@param event_state schedule.event.state
@@ -44,7 +61,7 @@ function M.can_start_chain(after_event_id, event_state, current_time, last_updat
 		return false, nil
 	end
 
-	if after_status.status ~= "completed" then
+	if not M.is_chain_parent_ready(after_status, current_time) then
 		return false, nil
 	end
 
@@ -78,7 +95,7 @@ function M.update_chained_events(all_events, current_time, last_update_time, is_
 			if type(event_state.after) == "string" then
 				local after_event_id = event_state.after
 				local after_status = state.get_event_state(after_event_id)
-				if after_status and after_status.status == "completed" and after_status.end_time then
+				if after_status and M.is_chain_parent_ready(after_status, current_time) then
 					local current_event_state = state.get_event_state(event_id)
 					if current_event_state and (is_startable_status(current_event_state.status) or current_event_state.status == "paused") then
 						if not current_event_state.start_time or current_event_state.start_time < after_status.end_time then

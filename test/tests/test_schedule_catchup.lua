@@ -13,6 +13,80 @@ return function()
 			time = 0
 		end)
 
+		it("Should not replay a fully missed window when catch_up is false", function()
+			local runs = {}
+			schedule.on_event:subscribe(function(event)
+				if event.event_id == "sale" then
+					table.insert(runs, event.callback_type)
+				end
+				return true
+			end)
+
+			local event = schedule.event("sale")
+				:start_at(100)
+				:duration(100)
+				:catch_up(false)
+				:save()
+
+			-- Window was 100..200; now is 1000
+			time = 1000
+			schedule.update()
+
+			assert(event:get_status() == "completed", "Missed window should complete, got " .. event:get_status())
+			assert(#runs == 0, "catch_up(false) must not replay start/enabled/end/disabled, got " .. table.concat(runs, ","))
+		end)
+
+
+		it("Should continue a cyclic event after a missed window without replaying it", function()
+			local event = schedule.event("sale")
+				:start_at(0)
+				:duration(100)
+				:cycle("every", { seconds = 200, skip_missed = true })
+				:catch_up(false)
+				:save()
+
+			-- First window 0..100 is over; next starts at 200
+			time = 150
+			schedule.update()
+			assert(event:get_status() == "pending",
+				"Gap until the next window should be pending, got " .. event:get_status())
+			assert(schedule.get_event_state("sale").next_cycle_time == 200,
+				"Next window should be scheduled at 200, got " ..
+					tostring(schedule.get_event_state("sale").next_cycle_time))
+			assert(event:get_start_time() == 200,
+				"Should wait for the next window, got " .. tostring(event:get_start_time()))
+
+			time = 200
+			schedule.update()
+			assert(event:get_status() == "active", "Should start the next occurrence, got " .. event:get_status())
+			assert(event:get_cycle_count() == 1, "This is occurrence 1 on the grid, got " .. event:get_cycle_count())
+		end)
+
+
+		it("Should replay a fully missed window when catch_up is true", function()
+			local runs = {}
+			schedule.on_event:subscribe(function(event)
+				if event.event_id == "sale" then
+					table.insert(runs, event.callback_type)
+				end
+				return true
+			end)
+
+			local event = schedule.event("sale")
+				:start_at(100)
+				:duration(100)
+				:catch_up(true)
+				:save()
+
+			time = 1000
+			schedule.update()
+
+			assert(event:get_status() == "completed", "Missed window should complete")
+			assert(table.concat(runs, ",") == "start,enabled,end,disabled",
+				"catch_up(true) should replay the lifecycle, got " .. table.concat(runs, ","))
+		end)
+
+
 		it("Should catch up missed events when catch_up is true", function()
 			local count = 0
 
@@ -35,7 +109,7 @@ return function()
 			time = 1000
 			schedule.update()
 			assert(count > 5, "on_start should be called multiple times")
-			assert(event:get_status() == "completed", "Event should be completed after catch up")
+			assert(event:get_status() == "pending", "After catch-up the next window should be pending, got " .. event:get_status())
 		end)
 
 

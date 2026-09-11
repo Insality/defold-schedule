@@ -89,7 +89,9 @@ Get event status
 event:get_time_left()
 ```
 
-Get time left until event ends. A paused event keeps the time it had when it was paused.
+Get time left until the **run** ends. A paused event keeps the time it had when it was paused.
+For clip events this is the leftover window; for exceed it is `now + duration` from join.
+See [timing](timing.md).
 
 - **Returns:**
 	- `time_left` *(number)*: Returns -1 for infinity events, 0 for completed events, or remaining seconds
@@ -125,7 +127,7 @@ Get event progress
 event:get_payload()
 ```
 
-Get event payload
+Get event payload. When none was set, stores and returns `{}`. Otherwise returns the value passed to `:payload()`.
 
 - **Returns:**
 	- `payload` *(any)*: Event payload data
@@ -149,7 +151,7 @@ Get event category
 event:get_start_time()
 ```
 
-Get event start time
+Get event start time. Clip: the occurrence. Exceed: when this run actually started (`now` at join).
 
 - **Returns:**
 	- `start_time` *(number|nil)*: Event start time in seconds or nil
@@ -161,7 +163,8 @@ Get event start time
 event:get_end_time()
 ```
 
-Get event end time
+Get event end time. Clip: the join/run window end. Exceed: `start + duration` of this run (may pass `end_at`).
+See [timing](timing.md).
 
 - **Returns:**
 	- `end_time` *(number|nil)*: Event end time in seconds, or nil for infinity events and events that have no end yet
@@ -173,10 +176,14 @@ Get event end time
 event:get_cycle_count()
 ```
 
-Get how many times the event has been activated by its cycle
+Get how many times the event has been activated by its cycle.
+With `start_at` + `every` (default `anchor = "start"`), this is the occurrence index on the calendar
+grid (0 for the first window), including occurrences skipped by `min_time` or `skip_missed`.
+Otherwise this is how many times the cycle actually started: 0 on the first run, then 1, 2, ...
+`anchor = "end"` spaces occurrences by duration + seconds, so it counts starts even with `start_at`.
 
 - **Returns:**
-	- `cycle_count` *(number)*: Number of completed cycle activations, 0 for the first run
+	- `cycle_count` *(number)*: Calendar occurrence index with `start_at` + `every`; otherwise the number of actual cycle starts, 0 for the first run
 
 ### is_active
 
@@ -252,7 +259,7 @@ event:resume()
 
 Resume this paused event. Sets status back to "active".
 Only works on paused events.
-For events with duration (not end_at), extends end_time by the pause duration.
+For events with relative duration and no `end_at`, extends end_time by the pause duration.
 
 - **Returns:**
 	- `success` *(boolean)*: True if event was resumed

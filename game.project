@@ -24,7 +24,7 @@ include_dirs = schedule
 
 [project]
 title = Defold Schedule
-version = 2
+version = 3
 publisher = Insality
 developer = Insality
 dependencies#0 = https://github.com/Insality/asset-store/archive/refs/heads/main.zip

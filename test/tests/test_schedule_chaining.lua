@@ -217,7 +217,7 @@ return function()
 
 			time = 120
 			schedule.update()
-			assert(craft_1:get_status() == "completed")
+			assert(craft_1:get_status() == "pending", "Parent should wait for the next cycle, got " .. craft_1:get_status())
 			assert(craft_2:get_status() == "active")
 
 			time = 180

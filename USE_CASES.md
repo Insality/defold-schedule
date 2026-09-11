@@ -12,6 +12,8 @@
 	- [Daily rewards](#daily-rewards)
 	- [Weekend event](#weekend-event)
 	- [Limited time offer with conditions](#limited-time-offer-with-conditions)
+	- [Season plus a week from join](#season-plus-a-week-from-join)
+	- [Daily anytime offer](#daily-anytime-offer)
 	- [One global handler](#one-global-handler)
 - [Chaining events](#chaining-events)
 - [Save and restore](#save-and-restore)
@@ -242,7 +244,7 @@ at once. Pick the option that matches your design:
 | `catch_up(true)`                             | 60 rewards, 60 callbacks in one update |
 | `catch_up(true)` + `max_catches = 7`         | 7 rewards                    |
 | `catch_up(true)` + `skip_missed = true`      | 1 reward                     |
-| `catch_up(false)`                            | 1 reward                     |
+| `catch_up(false)`                            | 0 rewards, unless you are inside a running occurrence |
 
 Two practical notes: the callbacks run synchronously, so grant resources there and show one summary
 popup afterwards instead of one popup per reward. And keep `max_catches` on frequent cycles - the
@@ -252,8 +254,8 @@ the log.
 
 ### Weekend event
 
-Calendar cycles find their next occurrence on their own, no `start_at` needed. A player who opens
-the game in the middle of the window sees it as active.
+The player who opens the game in the middle of the window sees the leftover. Join and run are the
+same interval (clip). How windows work: [timing](api/timing.md).
 
 ```lua
 local schedule = require("schedule.schedule")
@@ -301,12 +303,70 @@ schedule.event("starter_offer")
 Add `:abort_on_fail()` when a missed condition means the offer is gone for good. The event becomes
 `aborted`, `on_fail` is called once, and the schedule never retries it.
 
-Use `:min_time()` to avoid starting something that is about to expire:
+Use `:min_time()` to avoid starting something that is about to expire. It looks at leftover **join**
+time. A one-shot event is cancelled; a cyclic event skips this occurrence and waits for the next one:
 
 ```lua
 schedule.event("season_sale")
 	:end_at("2026-03-01T00:00:00")
 	:min_time(schedule.DAY) -- Do not show a sale that lasts less than a day
+	:save()
+```
+
+A week that must not pass the season date is clip `duration` + `end_at` (optionally `min_time = duration`
+to refuse a short leftover):
+
+```lua
+schedule.event("season_week")
+	:start_at("2026-02-22T00:00:00")
+	:duration(schedule.WEEK)
+	:end_at("2026-03-01T00:00:00")
+	:min_time(schedule.WEEK)
+	:save()
+```
+
+
+### Season plus a week from join
+
+Door is the season date; play time is one week from when the player enters, and may pass `end_at`.
+
+```lua
+schedule.event("season_week")
+	:category("liveops")
+	:start_at("2026-01-01T00:00:00")
+	:end_at("2026-12-31T00:00:00")
+	:duration(schedule.WEEK, { exceed_end_time = true })
+	:on_enabled(function() enable_season_week() end)
+	:on_disabled(function() disable_season_week() end)
+	:save()
+```
+
+Two-day slot, one day of play from join (cyclic):
+
+```lua
+schedule.event("slot")
+	:start_at("2026-01-01T00:00:00")
+	:cycle("every", { seconds = 2 * schedule.DAY, skip_missed = true })
+	:duration(schedule.DAY, { exceed_end_time = true })
+	:save()
+```
+
+Same idea as a one-shot: `start_at` + `end_at` two days later + `duration(1d)` with or without the flag
+(clip leftover vs a full day past Monday).
+
+
+### Daily anytime offer
+
+Thirty minutes whenever the player joins that calendar day. Join window is the whole day; run is 30
+minutes from join. If they join at 23:50, the run crosses midnight and Tuesday waits until 00:20,
+then starts a new 30 minutes.
+
+```lua
+schedule.event("daily_offer")
+	:category("offer")
+	:start_at("2026-01-01T00:00:00")
+	:cycle("every", { seconds = schedule.DAY, skip_missed = true })
+	:duration(30 * schedule.MINUTE, { exceed_end_time = true })
 	:save()
 ```
 
@@ -425,9 +485,14 @@ schedule.clear() -- Everything
   absolute time and does not need frequent updates.
 - **All times are UTC.** `"2026-01-01T00:00:00"` and `time = "14:00"` are UTC, there is no local time
   zone conversion.
-- **`catch_up` only matters for cycles.** A single event that ran out while the game was closed is
-  always completed on the next update. Default: `false` for events with a duration, `true` without.
+- **`catch_up(false)` does not replay a fully missed window.** The event is marked `completed`
+  without `start` / `enabled` / `end` / `disabled`. Set `catch_up(true)` to replay that run
+  (and missed cycles). Default: `false` for events with a duration, `true` without.
 - **`cancelled` and `aborted` are final.** The update loop never revives them, call `event:start()`
   to run such an event anyway.
+- **Re-declaring an event keeps the stored occurrence**, even when `start_at` is set. To change
+  the calendar, `remove()` it and create it again.
 - **A new event is `pending`** until the first `update()`, which is where conditions and `min_time`
-  are checked.
+  are checked. `min_time` uses leftover join time: it cancels a one-shot and skips a cyclic occurrence.
+- **Join window vs run:** clip (default) uses the same interval; `:duration(n, { exceed_end_time = true })`
+  joins the slot / until `end_at` and runs `n` seconds from join. See [timing](api/timing.md).

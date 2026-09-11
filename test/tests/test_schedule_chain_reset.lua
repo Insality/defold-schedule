@@ -33,7 +33,7 @@ return function()
 
 			time = 90
 			schedule.update()
-			assert(parent:get_status() == "completed", "Parent should complete")
+			assert(parent:get_status() == "pending", "Parent should wait for the next cycle, got " .. parent:get_status())
 			assert(child:get_status() == "active", "Child should start after parent completes")
 			assert(child:get_start_time() == 90, "Child should start at parent end time")
 
@@ -105,7 +105,7 @@ return function()
 
 			time = 80
 			schedule.update()
-			assert(parent:get_status() == "completed", "Parent cycle 1 complete")
+			assert(parent:get_status() == "pending", "Parent cycle 1 should wait for the next, got " .. parent:get_status())
 			assert(child:get_status() == "active", "Child should start")
 			assert(child:get_start_time() == 80, "Child start time should be set")
 
@@ -121,7 +121,7 @@ return function()
 
 			time = 150
 			schedule.update()
-			assert(parent:get_status() == "completed", "Parent cycle 2 complete")
+			assert(parent:get_status() == "pending", "Parent cycle 2 should wait for the next, got " .. parent:get_status())
 			assert(child:get_status() == "active", "Child should start again")
 			assert(child:get_start_time() ~= nil, "Child start time should be set again")
 		end)

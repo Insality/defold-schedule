@@ -91,7 +91,7 @@ return function()
 
 			time = time + 86400
 			schedule.update()
-			assert(event:get_status() == "completed", "Should complete after the duration")
+			assert(event:get_status() == "pending", "Should wait for the next year, got " .. event:get_status())
 		end)
 	end)
 end

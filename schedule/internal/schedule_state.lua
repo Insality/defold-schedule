@@ -23,12 +23,13 @@
 ---@field cycle_count number|nil
 ---@field next_cycle_time number|nil
 ---@field category string|nil
----@field payload any|nil
+---@field payload any Custom data, `{}` when omitted
 ---@field after number|string|nil Seconds or event ID to chain after
 ---@field after_options table|nil Options for chaining (wait_online, etc.)
 ---@field start_at number|string|nil Timestamp or ISO date string
 ---@field end_at number|string|nil Timestamp or ISO date string
 ---@field duration number|nil Duration in seconds
+---@field exceed_end_time boolean|nil If true, run is now+duration and may pass the join window
 ---@field infinity boolean|nil Event never ends
 ---@field cycle schedule.cycle_config|nil
 ---@field conditions schedule.condition_data[]|nil

@@ -89,7 +89,7 @@ return function()
 
 			time = time + 86400
 			schedule.update()
-			assert(event:get_status() == "completed", "Should complete after the duration")
+			assert(event:get_status() == "pending", "Should wait for the next month, got " .. event:get_status())
 
 			-- February 15th
 			time = JAN_1 + 45 * 86400

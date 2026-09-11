@@ -88,7 +88,9 @@ event_builder:end_at(end_at)
 ```
 
 Set event to end at an absolute time (calendar-based end date). Use for fixed-date events like LiveOps.
-Use `duration()` for relative durations calculated from start time.
+Can be combined with `duration()`: clip ends at `min(start + duration, end_at)`;
+with `exceed_end_time` the join window ends here and the run can pass it.
+See [timing](timing.md).
 
 - **Parameters:**
 	- `end_at` *(string|number)*: Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
@@ -100,14 +102,18 @@ Use `duration()` for relative durations calculated from start time.
 
 ---
 ```lua
-event_builder:duration(duration)
+event_builder:duration(duration, [options])
 ```
 
-Set the event duration. Use for crafting timers, cooldowns, temporary buffs, or any relative-duration event.
-End time is calculated as start_time + duration. For recurring events, each cycle uses the same duration.
+Set the event duration. Clip (default): join and run are `[occurrence, occurrence + duration)`,
+capped by `end_at` when both are set; late join is leftover. Exceed:
+`:duration(n, { exceed_end_time = true })` starts at `now` and runs `n` seconds, and may pass
+the join window (`end_at` or the next cycle occurrence).
+See [timing](timing.md).
 
 - **Parameters:**
 	- `duration` *(number)*: Duration in seconds (use `schedule.HOUR`, `schedule.DAY`, etc. for clarity)
+	- `[options]` *(table|nil)*: Options table with `exceed_end_time` (boolean)
 
 - **Returns:**
 	- `Self` *(schedule.event_builder)*: for method chaining
@@ -176,6 +182,7 @@ event_builder:payload([payload])
 ```
 
 Set custom data payload passed to event handlers and callbacks. Included in all event notifications.
+When omitted, `payload` is `{}`. A value passed to `:payload()` is kept as-is and is not coerced to a table.
 Store lightweight data (IDs, configuration objects). Avoid large objects or functions.
 
 - **Parameters:**
@@ -193,7 +200,9 @@ event_builder:catch_up(catch_up)
 
 Set whether the event should catch up on missed time when the game resumes after being offline.
 Enable for offline progression (crafting, daily rewards). Disable for LiveOps or time-sensitive events.
-Events with a duration (or an `end_at`) default to `false`, events without one default to `true`.
+When false, a fully missed window is marked `completed` without emitting start/enabled/end/disabled.
+When true, that missed run is replayed. Cycles also replay missed occurrences only when this is true
+(and `skip_missed` is not set). Events with a duration (or an `end_at`) default to `false`, events without one default to `true`.
 
 - **Parameters:**
 	- `catch_up` *(boolean)*: true to enable offline catch-up, false to disable
@@ -208,8 +217,11 @@ Events with a duration (or an `end_at`) default to `false`, events without one d
 event_builder:min_time(min_time)
 ```
 
-Set the minimum time remaining required for the event to start. If less time remains, the event is cancelled.
+Set the minimum time remaining in the **join window** required for the event to start.
+If less time remains, a one-shot event is cancelled; a cyclic event skips this occurrence
+and waits for the next one, the same way later cycles are skipped.
 Use for LiveOps events or limited-time offers to prevent wasted activations.
+See [timing](timing.md).
 
 - **Parameters:**
 	- `min_time` *(number)*: Minimum seconds remaining required to start (use `schedule.DAY`, etc.)
@@ -318,7 +330,9 @@ event_builder:save()
 
 Save the event to the schedule system and return the event instance. Call as the final step after configuration.
 Nothing happens until `save()` is called. The event is validated, times are calculated, state is stored,
-and callbacks are registered. If an existing event with the same ID exists, its state is merged.
+and callbacks are registered. If an existing event with the same ID exists, its state is merged:
+stored `start_time` / `end_time` of the current occurrence are kept, even when `start_at` is set.
+To change the calendar window, `schedule.remove(id)` and create the event again.
 Returns the created event object, with methods like `get_time_left()` and `get_status()`.
 
 - **Returns:**
