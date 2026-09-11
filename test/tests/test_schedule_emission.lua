@@ -65,7 +65,7 @@ return function()
 
 			time = 70
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should complete")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 160
 			schedule.update()
@@ -96,7 +96,7 @@ return function()
 
 			time = 70
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should be completed")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 			assert(emission_count == 1, "Emission count should not increase on completion")
 
 			time = 160

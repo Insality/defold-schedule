@@ -559,6 +559,10 @@ function M._process_next_cycle(event_id, event_state, current_time)
 
 		if not next_cycle_time or next_cycle_time > current_time then
 			event_state.next_cycle_time = next_cycle_time
+			if next_cycle_time then
+				event_state.start_time = next_cycle_time
+				event_state.status = "pending"
+			end
 			return false
 		end
 
@@ -616,7 +620,7 @@ function M._ensure_start_time(event_state, current_time, last_update_time)
 	local after = event_state.after
 	if type(after) == "string" then
 		local after_status = state.get_event_state(after)
-		if after_status and after_status.status == "completed" and after_status.end_time then
+		if after_status and chaining.is_chain_parent_ready(after_status, current_time) then
 			if not start_time or start_time < after_status.end_time then
 				start_time = chaining.get_chain_start_time(event_state, after_status, current_time)
 				event_state.start_time = start_time
@@ -908,11 +912,13 @@ end
 ---@param end_time number|nil
 ---@param current_time number
 function M._activate_event(event_id, event_state, start_time, end_time, current_time)
+	local increment = event_state.cycle and event_state.end_time and start_time > event_state.end_time
 	event_state.status = "active"
 	event_state.start_time = start_time
 	event_state.end_time = end_time
 	event_state.last_update_time = current_time
-	M._set_cycle_count(event_state, start_time, false)
+	M._set_cycle_count(event_state, start_time, increment)
+	M._update_chained_events(event_id)
 
 	local event_data = M._create_event_data(event_id, event_state)
 	lifecycle.on_start(event_id, event_data)

@@ -27,7 +27,7 @@ return function()
 
 			time = 61
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should complete after duration")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 180
 			schedule.update()
@@ -49,7 +49,7 @@ return function()
 
 			time = 90
 			schedule.update()
-			assert(event:get_status() == "completed")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 160
 			schedule.update()
@@ -71,7 +71,7 @@ return function()
 
 			time = 90
 			schedule.update()
-			assert(event:get_status() == "completed")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 190
 			schedule.update()
@@ -120,7 +120,7 @@ return function()
 			schedule.update()
 			time = 10
 			schedule.update()
-			assert(event:get_status() == "completed", "First occurrence should complete, got " .. event:get_status())
+			assert(event:get_status() == "pending", "First occurrence should wait for the next cycle, got " .. event:get_status())
 
 			-- Enter occurrence 1 (110..120) with only 2s left, below min_time, so it is skipped
 			time = 118
@@ -151,7 +151,7 @@ return function()
 
 			time = 1000
 			schedule.update()
-			assert(event:get_status() == "active" or event:get_status() == "completed", "Should skip to current cycle")
+			assert(event:get_status() == "active" or event:get_status() == "pending", "Should skip to current or next cycle, got " .. event:get_status())
 		end)
 
 
@@ -196,7 +196,7 @@ return function()
 
 			time = 70
 			schedule.update()
-			assert(event:get_status() == "completed")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 160
 			schedule.update()
@@ -204,7 +204,7 @@ return function()
 
 			time = 170
 			schedule.update()
-			assert(event:get_status() == "completed", "Second cycle completed")
+			assert(event:get_status() == "pending", "Second cycle should wait for the next, got " .. event:get_status())
 
 			time = 260
 			schedule.update()
@@ -232,7 +232,7 @@ return function()
 
 			time = 70
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should complete")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 1000
 			schedule.update()
@@ -257,7 +257,7 @@ return function()
 
 			time = 70
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should complete")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 160
 			schedule.update()
@@ -267,7 +267,7 @@ return function()
 
 			time = 170
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should complete again")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			time = 260
 			schedule.update()

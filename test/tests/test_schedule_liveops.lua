@@ -79,6 +79,8 @@ return function()
 			assert(active_id == "puzzle", "Sep 10 is a puzzle day, got " .. tostring(active_id))
 			assert(schedule.get("puzzle"):get_cycle_count() == 126,
 				"Puzzle should be occurrence 126 on the Jan 1 grid, got " .. schedule.get("puzzle"):get_cycle_count())
+			assert(schedule.get("diamond"):get_status() == "pending",
+				"Diamond gap until Sep 11 should be pending, got " .. schedule.get("diamond"):get_status())
 			assert(schedule.get_event_state("diamond").next_cycle_time == JAN_1 + 253 * DAY,
 				"Diamond should already be scheduled for Sep 11, got " ..
 					tostring(schedule.get_event_state("diamond").next_cycle_time))
@@ -210,6 +212,28 @@ return function()
 				"Should start the next window, got " .. schedule.get("puzzle"):get_status())
 			assert(schedule.get("puzzle"):get_start_time() == JAN_1 + 254 * DAY,
 				"Next window should start on Sep 12, got " .. tostring(schedule.get("puzzle"):get_start_time()))
+		end)
+
+
+		it("Should keep a weekly LiveOps event pending in the gap after skip_missed", function()
+			-- Friday Sep 11 2026 12:00. Pickaxe windows are Tue and Sat for two days.
+			time = JAN_1 + 253 * DAY + 12 * HOUR
+
+			schedule.event("pickaxe")
+				:category("liveops")
+				:start_at("2026-01-03T00:00:00")
+				:duration(2 * DAY)
+				:cycle("weekly", { weekdays = { "tue", "sat" }, skip_missed = true })
+				:catch_up(false)
+				:save()
+
+			schedule.update()
+
+			local event = schedule.get("pickaxe")
+			assert(event:get_status() == "pending",
+				"Friday gap should be pending, got " .. event:get_status())
+			assert(event:get_start_time() == JAN_1 + 254 * DAY,
+				"Next window should be Saturday Sep 12, got " .. tostring(event:get_start_time()))
 		end)
 	end)
 end

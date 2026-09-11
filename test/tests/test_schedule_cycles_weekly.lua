@@ -121,7 +121,7 @@ return function()
 
 			time = time + 3600
 			schedule.update()
-			assert(event:get_status() == "completed", "Should complete after the duration")
+			assert(event:get_status() == "pending", "Should wait for the next Sunday, got " .. event:get_status())
 		end)
 	end)
 end

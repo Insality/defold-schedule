@@ -363,7 +363,7 @@ return function()
 
 			time = 10
 			schedule.update()
-			assert(event:get_status() == "completed", "Event should be completed")
+			assert(event:get_status() == "pending", "Event should wait for the next cycle, got " .. event:get_status())
 
 			-- Second cycle runs from 20 to 30
 			time = 25

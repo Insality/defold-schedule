@@ -48,11 +48,13 @@ return function()
 			-- First window 0..100 is over; next starts at 200
 			time = 150
 			schedule.update()
-			assert(event:get_status() == "completed",
-				"Missed window should complete, got " .. event:get_status())
+			assert(event:get_status() == "pending",
+				"Gap until the next window should be pending, got " .. event:get_status())
 			assert(schedule.get_event_state("sale").next_cycle_time == 200,
 				"Next window should be scheduled at 200, got " ..
 					tostring(schedule.get_event_state("sale").next_cycle_time))
+			assert(event:get_start_time() == 200,
+				"Should wait for the next window, got " .. tostring(event:get_start_time()))
 
 			time = 200
 			schedule.update()
@@ -107,7 +109,7 @@ return function()
 			time = 1000
 			schedule.update()
 			assert(count > 5, "on_start should be called multiple times")
-			assert(event:get_status() == "completed", "Event should be completed after catch up")
+			assert(event:get_status() == "pending", "After catch-up the next window should be pending, got " .. event:get_status())
 		end)
 
 
