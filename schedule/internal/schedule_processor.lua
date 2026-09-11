@@ -304,25 +304,52 @@ function M._should_skip_cycle(event_state, new_start_time, new_end_time, current
 end
 
 
+---How far apart two occurrence starts are for an `every` cycle.
+---`anchor = "end"` waits the interval after the window closes, so its period is the window plus
+---the interval. Everything that steps from one occurrence start to the next goes through here.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil period
+function M._occurrence_period(event_state, occurrence_start)
+	local cycle_config = event_state.cycle
+	local interval = cycle_config and cycle_config.seconds
+	if not interval or interval <= 0 then
+		return nil
+	end
+
+	if cycle_config.anchor ~= "end" then
+		return interval
+	end
+
+	-- With no window there is nothing to wait after, so the plain interval is the best guess
+	local occurrence_end = M.calculate_end_time(event_state, occurrence_start)
+	if not occurrence_end or occurrence_end <= occurrence_start then
+		return interval
+	end
+
+	return interval + (occurrence_end - occurrence_start)
+end
+
+
 ---Get the occurrence right after the given one, without skipping anything in between
 ---@param event_state schedule.event.state
----@param cycle_time number Occurrence to step from
+---@param occurrence_start number Occurrence start to step from
 ---@return number|nil next_cycle_time
-function M._following_cycle(event_state, cycle_time)
+function M._following_cycle(event_state, occurrence_start)
 	local cycle_config = event_state.cycle
 	if not cycle_config then
 		return nil
 	end
 
 	if cycle_config.type == "every" then
-		local interval = cycle_config.seconds
-		if not interval or interval <= 0 then
+		local period = M._occurrence_period(event_state, occurrence_start)
+		if not period then
 			return nil
 		end
-		return cycle_time + interval
+		return occurrence_start + period
 	end
 
-	return cycles.calculate_next_cycle(cycle_config, cycle_time + 1, cycle_time, event_state.start_time)
+	return cycles.calculate_next_cycle(cycle_config, occurrence_start + 1, occurrence_start, event_state.start_time)
 end
 
 
@@ -395,13 +422,8 @@ function M._collect_catchup_cycles(event_id, event_state, current_time)
 		return {}, nil
 	end
 
-	local anchor_time = (cycle_config.anchor == "end" and event_state.end_time) or event_state.start_time
-	if not anchor_time then
-		return {}, nil
-	end
-
-	return M._collect_finished_cycles(event_state, M._following_cycle(event_state, anchor_time), current_time,
-		M._get_catchup_budget(event_id, event_state))
+	return M._collect_finished_cycles(event_state, M._following_cycle(event_state, event_state.start_time),
+		current_time, M._get_catchup_budget(event_id, event_state))
 end
 
 
@@ -458,9 +480,9 @@ function M._get_next_cycle_time(event_state, current_time)
 		return nil
 	end
 
-	local anchor_time = (cycle_config.anchor == "end" and event_state.end_time) or event_state.start_time
-	if anchor_time then
-		return M._following_cycle(event_state, anchor_time)
+	local occurrence_start = event_state.start_time
+	if occurrence_start then
+		return M._following_cycle(event_state, occurrence_start)
 	end
 
 	return cycles.calculate_next_cycle(cycle_config, current_time, event_state.end_time, event_state.start_time)
@@ -469,10 +491,10 @@ end
 
 ---Get the cycle occurrence that follows the given one
 ---@param event_state schedule.event.state
----@param cycle_time number Occurrence to step from
+---@param occurrence_start number Occurrence start to step from
 ---@param current_time number
 ---@return number|nil next_cycle_time
-function M._next_cycle_after(event_state, cycle_time, current_time)
+function M._next_cycle_after(event_state, occurrence_start, current_time)
 	local cycle_config = event_state.cycle
 	if not cycle_config then
 		return nil
@@ -480,20 +502,20 @@ function M._next_cycle_after(event_state, cycle_time, current_time)
 
 	-- Interval cycles are evenly spaced, so a long offline period is one jump instead of a walk
 	if cycle_config.type == "every" then
-		local interval = cycle_config.seconds
-		if not interval or interval <= 0 then
+		local period = M._occurrence_period(event_state, occurrence_start)
+		if not period then
 			return nil
 		end
 
-		if cycle_time + interval <= current_time then
-			local missed_intervals = math.floor((current_time - cycle_time) / interval)
-			return cycle_time + missed_intervals * interval
+		if occurrence_start + period <= current_time then
+			local missed_periods = math.floor((current_time - occurrence_start) / period)
+			return occurrence_start + missed_periods * period
 		end
 
-		return cycle_time + interval
+		return occurrence_start + period
 	end
 
-	return cycles.calculate_next_cycle(cycle_config, cycle_time + 1, cycle_time, event_state.start_time)
+	return cycles.calculate_next_cycle(cycle_config, occurrence_start + 1, occurrence_start, event_state.start_time)
 end
 
 
