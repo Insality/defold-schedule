@@ -252,7 +252,9 @@ function M:start()
 	end
 
 	local current_time = time.get_time()
-	if not event_state.start_time then
+	local occurrence_start = event_state.start_time
+	if not occurrence_start then
+		occurrence_start = current_time
 		event_state.start_time = current_time
 	end
 
@@ -261,8 +263,12 @@ function M:start()
 	if event_state.infinity then
 		event_state.end_time = nil
 	else
-		local end_time = processor.calculate_end_time(event_state, event_state.start_time)
-		event_state.end_time = end_time
+		local actual_start, run_end = processor._run_times(event_state, occurrence_start, current_time)
+		event_state.start_time = actual_start
+		event_state.end_time = run_end
+	end
+	if event_state.cycle then
+		event_state.next_cycle_time = processor._following_cycle(event_state, occurrence_start)
 	end
 
 	self.state = event_state
@@ -338,7 +344,7 @@ end
 
 ---Resume this paused event. Sets status back to "active".
 ---Only works on paused events.
----For events with duration (not end_at), extends end_time by the pause duration.
+---For events with relative duration and no `end_at`, extends end_time by the pause duration.
 ---@return boolean success True if event was resumed
 function M:resume()
 	local event_id = self.state.event_id

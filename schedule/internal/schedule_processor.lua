@@ -51,22 +51,99 @@ function M.calculate_start_time(event_state, current_time, last_update_time)
 end
 
 
----Calculate event end time
+---Join window end: last moment this occurrence may still start.
+---Clip: occurrence + duration, capped by `end_at`. Exceed: next occurrence if cyclic, else `end_at`.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil join_end
+function M.join_end(event_state, occurrence_start)
+	if not occurrence_start or event_state.infinity then
+		return nil
+	end
+
+	local end_at = event_state.end_at and time.normalize_time(event_state.end_at) or nil
+
+	if event_state.exceed_end_time then
+		local slot_end = M._exceed_slot_end(event_state, occurrence_start)
+		if slot_end and end_at then
+			return math.min(slot_end, end_at)
+		end
+		if slot_end or end_at then
+			return slot_end or end_at
+		end
+		if event_state.duration then
+			return occurrence_start + event_state.duration
+		end
+		return nil
+	end
+
+	local duration_end = event_state.duration and (occurrence_start + event_state.duration) or nil
+	if duration_end and end_at then
+		return math.min(duration_end, end_at)
+	end
+	return duration_end or end_at
+end
+
+
+---Slot end for an exceed join window (until the next occurrence, without using join_end).
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@return number|nil slot_end
+function M._exceed_slot_end(event_state, occurrence_start)
+	local cycle_config = event_state.cycle
+	if not cycle_config then
+		return nil
+	end
+
+	if cycle_config.type == "every" and cycle_config.seconds and cycle_config.seconds > 0 then
+		if cycle_config.anchor == "end" then
+			if event_state.duration then
+				return occurrence_start + event_state.duration
+			end
+			return occurrence_start + cycle_config.seconds
+		end
+		return occurrence_start + cycle_config.seconds
+	end
+
+	return M._following_cycle(event_state, occurrence_start)
+end
+
+
+---Run start and end when this occurrence actually activates.
+---Exceed starts at `now` and always runs `duration` seconds. Clip keeps the occurrence window.
+---@param event_state schedule.event.state
+---@param occurrence_start number
+---@param current_time number
+---@return number actual_start
+---@return number|nil run_end
+function M._run_times(event_state, occurrence_start, current_time)
+	if event_state.exceed_end_time and event_state.duration then
+		return current_time, current_time + event_state.duration
+	end
+
+	return occurrence_start, M.calculate_end_time(event_state, occurrence_start)
+end
+
+
+---Calculate event run end time (when an already started run finishes).
 ---@param event_state schedule.event.state
 ---@param start_time number
 ---@return number|nil end_time Calculated end time in seconds, or nil for infinity events
 function M.calculate_end_time(event_state, start_time)
-	if event_state.infinity then
+	if event_state.infinity or not start_time then
 		return nil
 	end
 
-	if event_state.end_at then
-		return time.normalize_time(event_state.end_at)
-	elseif event_state.duration then
+	if event_state.exceed_end_time and event_state.duration then
 		return start_time + event_state.duration
 	end
 
-	return nil
+	local duration_end = event_state.duration and (start_time + event_state.duration) or nil
+	local end_at = event_state.end_at and time.normalize_time(event_state.end_at) or nil
+	if duration_end and end_at then
+		return math.min(duration_end, end_at)
+	end
+	return duration_end or end_at
 end
 
 
@@ -126,7 +203,7 @@ function M._is_below_min_time(event_state, start_time, current_time)
 		return false
 	end
 
-	local end_time = M.calculate_end_time(event_state, start_time)
+	local end_time = M.join_end(event_state, start_time)
 	if not end_time then
 		return false
 	end
@@ -154,7 +231,7 @@ function M._cancel_or_skip_min_time(event_id, event_state, start_time, current_t
 
 	event_state.status = "completed"
 	event_state.start_time = start_time
-	event_state.end_time = M.calculate_end_time(event_state, start_time)
+	event_state.end_time = M.join_end(event_state, start_time)
 	event_state.last_update_time = current_time
 	M.process_cycle(event_id, event_state, current_time)
 	return true
@@ -176,10 +253,11 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 		local start_time = event_state.start_time
 		if start_time and current_time >= start_time then
 			if not event_state.cycle then
-				local end_time = M.calculate_end_time(event_state, start_time)
-				if end_time and current_time >= end_time then
-					-- The whole event happened while offline, replay it as one activation
-					M._replay_event_run(event_id, event_state, start_time, end_time, current_time)
+				local join_end = M.join_end(event_state, start_time)
+				if join_end and current_time >= join_end then
+					-- The whole join window happened while offline, replay it as one activation
+					local run_end = M.calculate_end_time(event_state, start_time) or join_end
+					M._replay_event_run(event_id, event_state, start_time, run_end, current_time)
 					event_state.status = "completed"
 					return true
 				end
@@ -265,12 +343,14 @@ end
 ---@param event_state schedule.event.state
 ---@param new_start_time number
 ---@param new_end_time number|nil
-function M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
+---@param occurrence_start number|nil Grid occurrence this run belongs to
+function M._activate_cycle(event_id, event_state, new_start_time, new_end_time, occurrence_start)
+	occurrence_start = occurrence_start or new_start_time
 	event_state.status = "active"
 	event_state.start_time = new_start_time
 	event_state.end_time = new_end_time
-	M._set_cycle_count(event_state, new_start_time, true)
-	event_state.next_cycle_time = nil
+	M._set_cycle_count(event_state, occurrence_start, true)
+	event_state.next_cycle_time = M._following_cycle(event_state, occurrence_start)
 
 	M._update_chained_events(event_id)
 
@@ -319,7 +399,7 @@ function M._occurrence_period(event_state, occurrence_start)
 	end
 
 	-- No window to wait after, fall back to the plain interval
-	local occurrence_end = M.calculate_end_time(event_state, occurrence_start)
+	local occurrence_end = M.join_end(event_state, occurrence_start)
 	if not occurrence_end or occurrence_end <= occurrence_start then
 		return interval
 	end
@@ -384,13 +464,14 @@ function M._collect_finished_cycles(event_state, from_time, current_time, budget
 			break
 		end
 
-		local cycle_end = M.calculate_end_time(event_state, cycle_start)
-		if not cycle_end or cycle_end > current_time then
+		local cycle_join_end = M.join_end(event_state, cycle_start)
+		if not cycle_join_end or cycle_join_end > current_time then
 			break
 		end
 
 		local occurrence_start = cycle_start
-		table.insert(finished_cycles, { start = occurrence_start, end_time = cycle_end })
+		local cycle_run_end = M.calculate_end_time(event_state, occurrence_start) or cycle_join_end
+		table.insert(finished_cycles, { start = occurrence_start, end_time = cycle_run_end })
 		cycle_start = M._following_cycle(event_state, occurrence_start)
 	end
 
@@ -528,7 +609,7 @@ function M._resolve_cycle_time(event_state, current_time, from_time)
 	end
 
 	for _ = 1, MAX_CYCLE_STEPS do
-		local cycle_end = M.calculate_end_time(event_state, cycle_time)
+		local cycle_end = M.join_end(event_state, cycle_time)
 		if not cycle_end or cycle_end > current_time then
 			return cycle_time
 		end
@@ -567,11 +648,12 @@ function M._process_next_cycle(event_id, event_state, current_time)
 		end
 
 		local new_start_time = next_cycle_time
-		local new_end_time = M.calculate_end_time(event_state, new_start_time)
+		local new_end_time = M.join_end(event_state, new_start_time)
 
 		local should_skip, skipped_cycle_time = M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
 		if not should_skip then
-			M._activate_cycle(event_id, event_state, new_start_time, new_end_time)
+			local actual_start, run_end = M._run_times(event_state, new_start_time, current_time)
+			M._activate_cycle(event_id, event_state, actual_start, run_end, new_start_time)
 			return true
 		end
 
@@ -660,7 +742,7 @@ function M._align_stale_calendar_start(event_state, start_time, current_time)
 	local occurrence = M._resolve_cycle_time(event_state, current_time, anchor)
 	if occurrence and occurrence ~= start_time then
 		event_state.start_time = occurrence
-		event_state.end_time = M.calculate_end_time(event_state, occurrence)
+		event_state.end_time = M.join_end(event_state, occurrence)
 		return occurrence
 	end
 
@@ -695,18 +777,19 @@ end
 ---@param current_time number
 ---@return boolean started
 function M._open_or_close_window(event_id, event_state, start_time, current_time)
-	local end_time = M.calculate_end_time(event_state, start_time)
+	local join_end = M.join_end(event_state, start_time)
 
-	if end_time and current_time >= end_time then
-		M._close_elapsed_start(event_id, event_state, start_time, end_time, current_time)
+	if join_end and current_time >= join_end then
+		M._close_elapsed_start(event_id, event_state, start_time, join_end, current_time)
 		return true
 	end
 
-	M._activate_event(event_id, event_state, start_time, end_time, current_time)
+	local actual_start, run_end = M._run_times(event_state, start_time, current_time)
+	M._activate_event(event_id, event_state, actual_start, run_end, current_time, start_time)
 
 	-- A chained event with no duration is a trigger: fire and complete in the same update
-	if not end_time and not event_state.infinity and event_state.after and not event_state.start_at then
-		M._complete_event(event_id, event_state, start_time, end_time, current_time)
+	if not run_end and not event_state.infinity and event_state.after and not event_state.start_at then
+		M._complete_event(event_id, event_state, actual_start, run_end, current_time)
 		M.process_cycle(event_id, event_state, current_time)
 	end
 
@@ -911,13 +994,18 @@ end
 ---@param start_time number
 ---@param end_time number|nil
 ---@param current_time number
-function M._activate_event(event_id, event_state, start_time, end_time, current_time)
-	local increment = event_state.cycle and event_state.end_time and start_time > event_state.end_time
+---@param occurrence_start number|nil Grid occurrence this run belongs to
+function M._activate_event(event_id, event_state, start_time, end_time, current_time, occurrence_start)
+	occurrence_start = occurrence_start or start_time
+	local increment = event_state.cycle and event_state.end_time and occurrence_start > event_state.end_time
 	event_state.status = "active"
 	event_state.start_time = start_time
 	event_state.end_time = end_time
 	event_state.last_update_time = current_time
-	M._set_cycle_count(event_state, start_time, increment)
+	M._set_cycle_count(event_state, occurrence_start, increment)
+	if event_state.cycle then
+		event_state.next_cycle_time = M._following_cycle(event_state, occurrence_start)
+	end
 	M._update_chained_events(event_id)
 
 	local event_data = M._create_event_data(event_id, event_state)

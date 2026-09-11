@@ -99,7 +99,9 @@ end
 
 
 ---Set event to end at an absolute time (calendar-based end date). Use for fixed-date events like LiveOps.
----Use `duration()` for relative durations calculated from start time.
+---Can be combined with `duration()`: clip (default) ends at `min(start + duration, end_at)`;
+---with `exceed_end_time` the join window ends at `end_at` and the run can pass it.
+---See `api/timing.md`.
 ---@param end_at number|string Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
 ---@return schedule.event_builder Self for method chaining
 function M:end_at(end_at)
@@ -110,14 +112,22 @@ function M:end_at(end_at)
 end
 
 
----Set the event duration. Use for crafting timers, cooldowns, temporary buffs, or any relative-duration event.
----End time is calculated as start_time + duration. For recurring events, each cycle uses the same duration.
+---Set the event duration. Clip (default): join and run are `[occurrence, occurrence + duration)`
+---(capped by `end_at` when both are set); late join is leftover. Exceed:
+---`:duration(n, { exceed_end_time = true })` starts at `now` and runs `n` seconds, and may pass
+---the join window (`end_at` or the next cycle occurrence). See `api/timing.md`.
 ---@param duration number Duration in seconds (use `schedule.HOUR`, `schedule.DAY`, etc. for clarity)
+---@param options table|nil Options table with `exceed_end_time` (boolean)
 ---@return schedule.event_builder Self for method chaining
-function M:duration(duration)
+function M:duration(duration, options)
 	assert(type(duration) == "number" and duration >= 0, "Event duration should be a positive number of seconds")
+	assert(options == nil or type(options) == "table", "Event duration options should be a table")
 
 	self.config.duration = duration
+	if options and options.exceed_end_time ~= nil then
+		assert(type(options.exceed_end_time) == "boolean", "Event exceed_end_time should be a boolean")
+		self.config.exceed_end_time = options.exceed_end_time
+	end
 	return self
 end
 
@@ -225,7 +235,7 @@ function M:catch_up(catch_up)
 end
 
 
----Set the minimum time remaining required for the event to start.
+---Set the minimum time remaining in the **join window** required for the event to start.
 ---If less time remains, a one-shot event is cancelled; a cyclic event skips this occurrence
 ---and waits for the next one, the same way later cycles are skipped.
 ---Use for LiveOps events or limited-time offers to prevent wasted activations.
@@ -358,12 +368,16 @@ function M._calculate_end_time(config, start_time, existing_end_time)
 		return existing_end_time
 	end
 
-	if config.end_at then
-		return time.normalize_time(config.end_at)
-	elseif config.duration and start_time then
+	if config.exceed_end_time and config.duration and start_time then
 		return start_time + config.duration
 	end
-	return nil
+
+	local duration_end = config.duration and start_time and (start_time + config.duration) or nil
+	local end_at = config.end_at and time.normalize_time(config.end_at) or nil
+	if duration_end and end_at then
+		return math.min(duration_end, end_at)
+	end
+	return duration_end or end_at
 end
 
 
@@ -432,6 +446,7 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 		start_at = merge_value(config.start_at, existing_state and existing_state.start_at),
 		end_at = merge_value(config.end_at, existing_state and existing_state.end_at),
 		duration = merge_value(config.duration, existing_state and existing_state.duration),
+		exceed_end_time = merge_value(config.exceed_end_time, existing_state and existing_state.exceed_end_time),
 		infinity = merge_value(config.infinity, existing_state and existing_state.infinity),
 		cycle = merge_value(config.cycle, existing_state and existing_state.cycle),
 		conditions = merge_value(config.conditions, existing_state and existing_state.conditions),
@@ -446,7 +461,8 @@ end
 ---@param config table Builder config
 function M._validate_config(config)
 	assert(config.event_id == nil or type(config.event_id) == "string", "Event id should be a string")
-	assert(not (config.duration and config.end_at), "Event can not have both duration() and end_at(), pick one")
+	assert(not (config.exceed_end_time and config.duration == nil),
+		"Event exceed_end_time requires duration()")
 	assert(not (config.infinity and (config.duration or config.end_at)),
 		"Event can not be infinity() and have duration() or end_at() at the same time")
 	assert(not (config.start_at and config.after), "Event can not have both start_at() and after(), pick one")
