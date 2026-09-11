@@ -91,6 +91,22 @@ return function()
 		end)
 
 
+		it("Should keep registered conditions after reset_state", function()
+			local calls = 0
+			schedule.register_condition("keep_me", function()
+				calls = calls + 1
+				return true
+			end)
+
+			schedule.reset_state()
+			schedule.event("gated"):duration(10):condition("keep_me", {}):save()
+			schedule.update()
+
+			assert(calls == 1, "reset_state should not drop condition evaluators")
+			assert(schedule.get("gated"):get_status() == "active", "Event should start with the kept condition")
+		end)
+
+
 		it("Should default payload to an empty table", function()
 			local event = schedule.event("craft"):duration(10):save()
 

@@ -36,9 +36,9 @@
 schedule.reset_state()
 ```
 
-Reset all schedule state. Clears all events, callbacks, conditions, subscriptions and time tracking.
-The custom time function set with `set_time_function()` is kept, it is a system setting and not game state.
-Use for testing or implementing a "reset game" feature.
+Reset saved events, callbacks, subscriptions and time tracking.
+Registered condition evaluators and the custom time function stay: they are system
+settings, not game state. Use for testing or a "reset game" feature.
 
 ### get_state
 
