@@ -176,9 +176,10 @@ end
 
 
 ---Get how many times the event has been activated by its cycle.
----With `start_at` + `every`, this is the occurrence index on the calendar grid (0 for the first
----window), including occurrences skipped by `min_time` or `skip_missed`.
----Without `start_at`, this is how many times the cycle actually started: 0 on the first run, then 1, 2, ...
+---With `start_at` + `every` (default `anchor = "start"`), this is the occurrence index on the calendar
+---grid (0 for the first window), including occurrences skipped by `min_time` or `skip_missed`.
+---Otherwise this is how many times the cycle actually started: 0 on the first run, then 1, 2, ...
+---`anchor = "end"` spaces occurrences by duration + seconds, so it counts starts even with `start_at`.
 ---@return number cycle_count Calendar index with `start_at` + `every`; otherwise actual cycle starts, 0 for the first run
 function M:get_cycle_count()
 	return self.state.cycle_count or 0

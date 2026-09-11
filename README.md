@@ -238,7 +238,7 @@ It starts with the two ways to use the schedule - **pull** (keep the event id an
 - Re-declaring an event with `start_at` keeps the stored occurrence timings
 - `catch_up(false)` does not replay a fully missed window
 - Default `payload` to `{}`; a legacy nil payload is written back into state once
-- Cyclic `start_at` + `every` uses the calendar occurrence as `cycle_count`
+- Cyclic `start_at` + `every` (anchor `start`) uses the calendar occurrence as `cycle_count`
 - Pending cyclic `start_at` lands a stale future `start_time` on the current or next occurrence
 
 </details>

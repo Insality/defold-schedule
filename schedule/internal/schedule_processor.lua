@@ -222,13 +222,18 @@ end
 
 
 ---Occurrence index on an `every` + `start_at` grid (0 for the first window).
----Nil when the event has no calendar anchor, the caller should then increment.
+---Nil when the event has no calendar grid, the caller should then increment.
 ---@param event_state schedule.event.state
 ---@param occurrence_start number
 ---@return number|nil index
 function M._occurrence_index(event_state, occurrence_start)
 	local cycle_config = event_state.cycle
 	if not cycle_config or cycle_config.type ~= "every" or not occurrence_start then
+		return nil
+	end
+
+	-- `anchor = "end"` spaces occurrences by duration + seconds, so there is no `start_at` grid
+	if cycle_config.anchor == "end" then
 		return nil
 	end
 
