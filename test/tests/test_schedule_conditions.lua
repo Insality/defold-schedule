@@ -125,6 +125,39 @@ return function()
 			schedule.update()
 			assert(event:get_status() ~= initial_status or event:get_status() == "active", "Status should change when condition becomes true")
 		end)
+
+
+		it("Should not start a cyclic leftover window when conditions fail after min_time skip", function()
+			-- weekly Monday + duration week: always inside a leftover window.
+			-- The first start_at is long dead, so min_time skips it and process_cycle
+			-- lands on this week. Conditions must still gate that start.
+			local JAN_1 = 1767225600
+			local player_level = 1
+			schedule.register_condition("min_level", function(min_level)
+				return player_level >= min_level
+			end)
+
+			time = JAN_1 + 253 * schedule.DAY + 12 * schedule.HOUR -- Friday Sep 11 2026
+			local event = schedule.event("puzzle_event")
+				:start_at("2026-01-05T00:00:00")
+				:duration(schedule.WEEK)
+				:min_time(schedule.HOUR)
+				:cycle("weekly", { weekdays = { "mon" }, skip_missed = true })
+				:condition("min_level", 6)
+				:catch_up(false)
+				:save()
+
+			schedule.update()
+			assert(event:get_status() == "pending",
+				"Level 1 must not start the leftover week, got " .. event:get_status())
+
+			player_level = 6
+			schedule.update()
+			assert(event:get_status() == "active",
+				"Should start the current week once the condition passes, got " .. event:get_status())
+			assert(event:get_start_time() == JAN_1 + 249 * schedule.DAY,
+				"Should keep Monday Sep 7 as the occurrence, got " .. tostring(event:get_start_time()))
+		end)
 	end)
 end
 
