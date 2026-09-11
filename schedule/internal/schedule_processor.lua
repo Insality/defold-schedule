@@ -719,8 +719,10 @@ function M._step_pending(event_id, event_state, current_time, last_update_time)
 		return false
 	end
 
+	-- The occurrence is settled (cancelled, or skipped and the cycle already advanced),
+	-- there is nothing left for the later steps of this update to do
 	if M._cancel_or_skip_min_time(event_id, event_state, start_time, current_time) then
-		return event_state.status == "active"
+		return true
 	end
 
 	if not M.should_start_event(event_id, event_state, current_time, last_update_time) then
