@@ -15,7 +15,7 @@ local MAX_CYCLE_STEPS = 512
 ---False until the first update after restore/reset, so `on_enabled` can fire once
 local active_events_ready = false
 
----True only while the first update after a restore/reset runs, where legacy state is repaired
+---True only during the first update after a restore/reset, where legacy state is repaired
 local is_cold_start = false
 
 ---How many cycles each event replayed during the current update, so max_catches is a per update limit
@@ -152,7 +152,6 @@ function M._cancel_or_skip_min_time(event_id, event_state, start_time, current_t
 		return true
 	end
 
-	-- The first occurrence is treated like any later one: skip it and look at the next
 	event_state.status = "completed"
 	event_state.start_time = start_time
 	event_state.end_time = M.calculate_end_time(event_state, start_time)
@@ -193,9 +192,7 @@ function M.process_catchup(event_id, event_state, last_update_time, current_time
 						M._apply_catchup_cycle(event_id, event_state, cycle_data.start, cycle_data.end_time, current_time)
 					end
 
-					-- Every replayed cycle already emitted its full lifecycle, so only the
-					-- state is settled here. A cycle that is running right now is picked up
-					-- by the regular cycle processing afterwards
+					-- Replayed cycles emitted their own lifecycle, only the final state is settled here
 					local last_cycle = processed_cycles[#processed_cycles]
 					event_state.status = "completed"
 					event_state.start_time = last_cycle.start
@@ -305,8 +302,8 @@ end
 
 
 ---How far apart two occurrence starts are for an `every` cycle.
----`anchor = "end"` waits the interval after the window closes, so its period is the window plus
----the interval. Everything that steps from one occurrence start to the next goes through here.
+---`anchor = "end"` waits the interval after the window closes, so its period is the window
+---plus the interval.
 ---@param event_state schedule.event.state
 ---@param occurrence_start number
 ---@return number|nil period
@@ -321,7 +318,7 @@ function M._occurrence_period(event_state, occurrence_start)
 		return interval
 	end
 
-	-- With no window there is nothing to wait after, so the plain interval is the best guess
+	-- No window to wait after, fall back to the plain interval
 	local occurrence_end = M.calculate_end_time(event_state, occurrence_start)
 	if not occurrence_end or occurrence_end <= occurrence_start then
 		return interval
@@ -397,8 +394,7 @@ function M._collect_finished_cycles(event_state, from_time, current_time, budget
 		cycle_start = M._following_cycle(event_state, occurrence_start)
 	end
 
-	-- Hitting the step limit means the rest of the missed occurrences are dropped and the event
-	-- jumps to the current one. Set max_catches to make that a deliberate number
+	-- At the step limit the remaining missed occurrences are dropped, use max_catches to bound this
 	if #finished_cycles >= MAX_CYCLE_STEPS and cycle_start and cycle_start <= current_time then
 		logger:warn("Catch-up stopped at the step limit, remaining missed cycles are skipped", {
 			collected = #finished_cycles,
@@ -465,8 +461,8 @@ end
 
 
 ---Get the cycle occurrence to look at, which can be in the past.
----It has to be the occurrence right after the last one, not the next future one: an occurrence
----that started while the game was closed can still be running now.
+---It has to be the one right after the last, not the next future one: an occurrence started
+---while the game was closed can still be running.
 ---@param event_state schedule.event.state
 ---@param current_time number
 ---@return number|nil next_cycle_time
@@ -520,8 +516,7 @@ end
 
 
 ---Resolve which cycle occurrence the event should be on right now.
----Occurrences that already ended are stepped over, so a single update never activates a stale cycle
----and never swallows the cycles in between.
+---Occurrences that already ended are stepped over, never activated and never swallowed.
 ---@param event_state schedule.event.state
 ---@param current_time number
 ---@param from_time number|nil Start from this occurrence instead of the stored next cycle
@@ -535,7 +530,6 @@ function M._resolve_cycle_time(event_state, current_time, from_time)
 	for _ = 1, MAX_CYCLE_STEPS do
 		local cycle_end = M.calculate_end_time(event_state, cycle_time)
 		if not cycle_end or cycle_end > current_time then
-			-- This occurrence is still running (or never ends)
 			return cycle_time
 		end
 
@@ -637,8 +631,7 @@ end
 ---Pending waits until `now >= start_time`. A stale future start_time would never start.
 ---Land on the current or next occurrence from `start_at`. Do not rewind to the first
 ---window: that marks the event completed on restart.
----Only restored state can be stale, so this runs once per restore instead of every update:
----parsing `start_at` for every pending event on every frame is pure waste.
+---Only restored state can be stale, so this runs once per restore, not on every update.
 ---@param event_state schedule.event.state
 ---@param start_time number|nil
 ---@param current_time number
@@ -741,8 +734,6 @@ function M._step_pending(event_id, event_state, current_time, last_update_time)
 		return false
 	end
 
-	-- The occurrence is settled (cancelled, or skipped and the cycle already advanced),
-	-- there is nothing left for the later steps of this update to do
 	if M._cancel_or_skip_min_time(event_id, event_state, start_time, current_time) then
 		return true
 	end
@@ -834,7 +825,6 @@ function M.update_all(current_time)
 		last_update_time = nil
 	end
 
-	-- Empty ready-flag means this is the first update after a restore/reset
 	is_cold_start = not active_events_ready
 	if is_cold_start then
 		for event_id, event_state in pairs(all_events) do
@@ -875,9 +865,8 @@ function M.update_all(current_time)
 end
 
 
----Check if event status allows starting.
----"cancelled", "aborted" and "failed" are terminal: the update loop never revives them,
----they can only be restarted explicitly with `event:start()`.
+---Check if event status allows starting. "cancelled", "aborted" and "failed" are terminal:
+---the update loop never revives them, only an explicit `event:start()` does.
 ---@param status string
 ---@return boolean
 function M._is_pending(status)
@@ -980,7 +969,6 @@ function M._collect_missed_cycles(event_id, event_state, start_time, current_tim
 	local cycles_list = M._collect_finished_cycles(event_state, start_time, current_time,
 		M._get_catchup_budget(event_id, event_state))
 
-	-- Only the last missed occurrence is replayed when the game asked to skip the ones in between
 	if skip_missed and #cycles_list > 1 then
 		cycles_list = { cycles_list[#cycles_list] }
 	end

@@ -358,7 +358,6 @@ function M:resume()
 	local current_time = time.get_time()
 	local pause_start_time = event_state.last_update_time
 
-	-- Calculate pause duration
 	local pause_duration = 0
 	if pause_start_time then
 		pause_duration = current_time - pause_start_time

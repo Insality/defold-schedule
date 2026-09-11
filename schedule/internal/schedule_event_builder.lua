@@ -322,8 +322,7 @@ local CALENDAR_CYCLES = {
 ---@return number|nil calculated_start_time
 function M._calculate_start_time(config, current_time, existing_start_time)
 	-- A persisted start time always wins, including when `start_at` is set: re-declaring
-	-- an event on game start must keep the current occurrence, not reset it to the calendar
-	-- anchor. To change the schedule, `remove()` the event and create it again
+	-- an event on game start must keep the current occurrence, not the calendar anchor
 	if existing_start_time then
 		return existing_start_time
 	end
