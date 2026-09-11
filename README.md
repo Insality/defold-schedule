@@ -144,11 +144,12 @@ schedule.event()
 	:after(time)
 	:start_at(time) -- Unix seconds or ISO (YYYY-MM-DDTHH:MM:SS)
 	-- Note: Weekly and yearly cycles can work without start_at - they compute next occurrence from now
-	-- When to end, choose one of the following
+	-- When to end: duration, end_at, both (clip), or infinity
 	:duration(time)
+	:duration(time, { exceed_end_time = true }) -- run N seconds from join; may pass the join window
 	:end_at(time)
 	:infinity() -- Works until manual cancellation
-	:min_time(time) -- Do not start if not enough time left; cyclic events skip to the next occurrence
+	:min_time(time) -- Do not start if the join window leftover is too short; cyclic events skip to the next occurrence
 	-- Conditions
 	:condition(condition_name, data)
 	:abort_on_fail() -- Abort event when conditions fail
@@ -174,6 +175,7 @@ Re-declaring an event with the same id keeps the stored `start_time` / `end_time
 occurrence, even when `start_at` is set. To change the calendar, `remove()` it and create it again.
 
 For detailed API documentation, please refer to:
+- [Timing: join window, run, clip, exceed](api/timing.md)
 - [API Reference](api/schedule_api.md)
 - [Event Builder API](api/schedule_event_builder.md)
 - [Event API](api/schedule_event.md)
@@ -218,6 +220,7 @@ Completed one-shot events stay in the state until you remove them. Drop the ones
 
 Read the [Use Cases](USE_CASES.md) file for worked examples: crafting timers and building queues,
 cooldowns, energy regeneration, LiveOps windows, daily rewards, offers with conditions and event chaining.
+Join window vs run, clip vs exceed: [timing](api/timing.md).
 
 It starts with the two ways to use the schedule - **pull** (keep the event id and query it) and
 **push** (attach callbacks and let the schedule call you) - and when to pick which.
@@ -240,6 +243,9 @@ It starts with the two ways to use the schedule - **pull** (keep the event id an
 - Default `payload` to `{}`; a legacy nil payload is written back into state once
 - Cyclic `start_at` + `every` (anchor `start`) uses the calendar occurrence as `cycle_count`
 - Pending cyclic `start_at` lands a stale future `start_time` on the current or next occurrence
+- `duration` + `end_at` clip to `min(start + duration, end_at)`
+- `:duration(n, { exceed_end_time = true })`: join the slot / until `end_at`, run `n` seconds from join
+- After an exceed run, the next open slot starts when free (it is not burned)
 
 </details>
 

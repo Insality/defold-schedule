@@ -88,7 +88,9 @@ event_builder:end_at(end_at)
 ```
 
 Set event to end at an absolute time (calendar-based end date). Use for fixed-date events like LiveOps.
-Use `duration()` for relative durations calculated from start time.
+Can be combined with `duration()`: clip ends at `min(start + duration, end_at)`;
+with `exceed_end_time` the join window ends here and the run can pass it.
+See [timing](timing.md).
 
 - **Parameters:**
 	- `end_at` *(string|number)*: Unix timestamp (seconds) or ISO date string (YYYY-MM-DDTHH:MM:SS)
@@ -100,14 +102,18 @@ Use `duration()` for relative durations calculated from start time.
 
 ---
 ```lua
-event_builder:duration(duration)
+event_builder:duration(duration, [options])
 ```
 
-Set the event duration. Use for crafting timers, cooldowns, temporary buffs, or any relative-duration event.
-End time is calculated as start_time + duration. For recurring events, each cycle uses the same duration.
+Set the event duration. Clip (default): join and run are `[occurrence, occurrence + duration)`,
+capped by `end_at` when both are set; late join is leftover. Exceed:
+`:duration(n, { exceed_end_time = true })` starts at `now` and runs `n` seconds, and may pass
+the join window (`end_at` or the next cycle occurrence).
+See [timing](timing.md).
 
 - **Parameters:**
 	- `duration` *(number)*: Duration in seconds (use `schedule.HOUR`, `schedule.DAY`, etc. for clarity)
+	- `[options]` *(table|nil)*: Options table with `exceed_end_time` (boolean)
 
 - **Returns:**
 	- `Self` *(schedule.event_builder)*: for method chaining
@@ -211,10 +217,11 @@ When true, that missed run is replayed. Cycles also replay missed occurrences on
 event_builder:min_time(min_time)
 ```
 
-Set the minimum time remaining required for the event to start.
+Set the minimum time remaining in the **join window** required for the event to start.
 If less time remains, a one-shot event is cancelled; a cyclic event skips this occurrence
 and waits for the next one, the same way later cycles are skipped.
 Use for LiveOps events or limited-time offers to prevent wasted activations.
+See [timing](timing.md).
 
 - **Parameters:**
 	- `min_time` *(number)*: Minimum seconds remaining required to start (use `schedule.DAY`, etc.)

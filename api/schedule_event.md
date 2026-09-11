@@ -89,7 +89,9 @@ Get event status
 event:get_time_left()
 ```
 
-Get time left until event ends. A paused event keeps the time it had when it was paused.
+Get time left until the **run** ends. A paused event keeps the time it had when it was paused.
+For clip events this is the leftover window; for exceed it is `now + duration` from join.
+See [timing](timing.md).
 
 - **Returns:**
 	- `time_left` *(number)*: Returns -1 for infinity events, 0 for completed events, or remaining seconds
@@ -149,7 +151,7 @@ Get event category
 event:get_start_time()
 ```
 
-Get event start time
+Get event start time. Clip: the occurrence. Exceed: when this run actually started (`now` at join).
 
 - **Returns:**
 	- `start_time` *(number|nil)*: Event start time in seconds or nil
@@ -161,7 +163,8 @@ Get event start time
 event:get_end_time()
 ```
 
-Get event end time
+Get event end time. Clip: the join/run window end. Exceed: `start + duration` of this run (may pass `end_at`).
+See [timing](timing.md).
 
 - **Returns:**
 	- `end_time` *(number|nil)*: Event end time in seconds, or nil for infinity events and events that have no end yet
@@ -256,7 +259,7 @@ event:resume()
 
 Resume this paused event. Sets status back to "active".
 Only works on paused events.
-For events with duration (not end_at), extends end_time by the pause duration.
+For events with relative duration and no `end_at`, extends end_time by the pause duration.
 
 - **Returns:**
 	- `success` *(boolean)*: True if event was resumed

@@ -78,7 +78,7 @@ schedule.event([id])
 
 Create a new event builder for scheduling timed events. Returns a builder with fluent API.
 Chain methods like `:category()`, `:after()`, `:duration()`, then call `:save()` to finalize.
-Nothing happens until `:save()` is called.
+Nothing happens until `:save()` is called. Join window vs run, clip vs exceed: [timing](timing.md).
 
 - **Parameters:**
 	- `[id]` *(string|nil)*: Unique identifier for the event for persistence, or nil to generate one
