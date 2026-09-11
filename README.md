@@ -246,6 +246,7 @@ It starts with the two ways to use the schedule - **pull** (keep the event id an
 - `duration` + `end_at` clip to `min(start + duration, end_at)`
 - `:duration(n, { exceed_end_time = true })`: join the slot / until `end_at`, run `n` seconds from join
 - After an exceed run, the next open slot starts when free (it is not burned)
+- `skip_missed` jumps to the current or next window; it does not activate missed occurrences
 
 </details>
 

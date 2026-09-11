@@ -368,7 +368,8 @@ end
 ---@return boolean should_skip True if cycle should be skipped
 ---@return number|nil next_cycle_time Next cycle time if skipped
 function M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
-	if not new_end_time or not M._is_below_min_time(event_state, new_start_time, current_time) then
+	local window_ended = new_end_time and current_time >= new_end_time
+	if not window_ended and not M._is_below_min_time(event_state, new_start_time, current_time) then
 		return false, nil
 	end
 
@@ -651,7 +652,9 @@ function M._process_next_cycle(event_id, event_state, current_time)
 		local new_end_time = M.join_end(event_state, new_start_time)
 
 		local should_skip, skipped_cycle_time = M._should_skip_cycle(event_state, new_start_time, new_end_time, current_time)
-		if not should_skip then
+		if should_skip then
+			event_state.next_cycle_time = skipped_cycle_time
+		else
 			-- Land on this occurrence as pending first. min_time skip of an old window
 			-- must not activate the current one without conditions (LiveOps level gate).
 			event_state.status = "pending"
@@ -665,8 +668,6 @@ function M._process_next_cycle(event_id, event_state, current_time)
 			M._activate_cycle(event_id, event_state, actual_start, run_end, new_start_time)
 			return true
 		end
-
-		event_state.next_cycle_time = skipped_cycle_time
 	end
 
 	return false
