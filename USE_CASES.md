@@ -303,6 +303,71 @@ schedule.event("starter_offer")
 Add `:abort_on_fail()` when a missed condition means the offer is gone for good. The event becomes
 `aborted`, `on_fail` is called once, and the schedule never retries it.
 
+A registered condition is callable from your own code as well, so the gate is written once and the
+game checks it the same way the schedule does:
+
+```lua
+schedule.register_condition("scene", function(scene_name)
+	return get_current_scene() == scene_name
+end)
+
+-- The schedule uses it to gate the event start
+schedule.event("tutorial_hint")
+	:after(30)
+	:condition("scene", "main")
+	:save()
+
+-- ...and your own code uses the very same check
+if schedule.check_condition("scene", "main") then
+	show_popup()
+end
+```
+
+`check_condition()` asserts on a name that was never registered, so a typo fails loudly instead of
+silently reading as "the gate is closed".
+
+
+### One event blocks another
+
+A condition can look at the schedule itself, so "do not start while an offer is running" is just
+another gate. `filter()` gives the events of a category that are active right now:
+
+```lua
+schedule.register_condition("no_active_in_category", function(data)
+	return next(schedule.filter(data.category, "active")) == nil
+end)
+
+schedule.event("daily_quest_liveops")
+	:category("liveops")
+	:cycle("every", { seconds = schedule.DAY, skip_missed = true })
+	:duration(schedule.HOUR)
+	:condition("no_active_in_category", { category = "offer" })
+	:save()
+```
+
+The event stays `pending` and retries on every `update()`, so it starts as soon as the last offer
+of that category closes.
+
+Two things decide whether this actually holds:
+
+**Give the blocking event the higher priority.** Both events can become available in the same
+`update()`. Events are processed by priority (higher first, ties by event id), so the offer has to
+be processed before the gated event, otherwise the gate looks at a schedule where the offer has not
+started yet:
+
+```lua
+schedule.event("triple_offer")
+	:category("offer")
+	:priority(20) -- Above the default 10, so the gate above sees it as active
+	:cycle("every", { seconds = schedule.DAY, skip_missed = true })
+	:duration(30 * schedule.MINUTE)
+	:save()
+```
+
+**The gate is one directional.** Conditions are checked at the start only, so an offer still opens
+on top of an already running quest. For mutual exclusion put the mirror condition on the offer too;
+with the priorities above the offer wins any tie.
+
 Use `:min_time()` to avoid starting something that is about to expire. It looks at leftover **join**
 time. A one-shot event is cancelled; a cyclic event skips this occurrence and waits for the next one:
 

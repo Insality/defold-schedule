@@ -158,6 +158,38 @@ return function()
 			assert(event:get_start_time() == JAN_1 + 249 * schedule.DAY,
 				"Should keep Monday Sep 7 as the occurrence, got " .. tostring(event:get_start_time()))
 		end)
+
+
+		it("Should check a single condition without an event", function()
+			local current_scene = "main"
+			schedule.register_condition("scene", function(scene_name)
+				return current_scene == scene_name
+			end)
+
+			assert(schedule.check_condition("scene", "main"), "Should pass on the current scene")
+			assert(not schedule.check_condition("scene", "battle"), "Should fail on another scene")
+
+			current_scene = "battle"
+			assert(schedule.check_condition("scene", "battle"), "Should follow the game state")
+		end)
+
+
+		it("Should assert on an unregistered condition", function()
+			local is_ok = pcall(schedule.check_condition, "unknown_condition", nil)
+			assert(not is_ok, "Unknown condition should assert")
+		end)
+
+
+		it("Should return a boolean from check_condition", function()
+			schedule.register_condition("truthy", function()
+				return "yes" ---@diagnostic disable-line: return-type-mismatch
+			end)
+			schedule.register_condition("nil_result", function()
+				return nil ---@diagnostic disable-line: return-type-mismatch
+			end)
+
+			assert(schedule.check_condition("truthy", nil) == true, "Truthy result should be true")
+			assert(schedule.check_condition("nil_result", nil) == false, "Nil result should be false")
+		end)
 	end)
 end
-

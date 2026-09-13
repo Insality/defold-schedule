@@ -910,6 +910,9 @@ end
 function M.update_all(current_time)
 	local last_update_time = state.get_last_update_time()
 	local all_events = state.get_all_events()
+	-- A gate condition that looks at other events relies on the higher priority event
+	-- being processed already, so the order must not come from the table hash order
+	local ordered_event_ids = state.get_ordered_event_ids()
 	local any_updated = false
 
 	-- The device clock can move backwards (player changed it, or the clock got corrected).
@@ -924,8 +927,9 @@ function M.update_all(current_time)
 
 	is_cold_start = not active_events_ready
 	if is_cold_start then
-		for event_id, event_state in pairs(all_events) do
-			if event_state.status == "active" then
+		for _, event_id in ipairs(ordered_event_ids) do
+			local event_state = all_events[event_id]
+			if event_state and event_state.status == "active" then
 				lifecycle.on_enabled(event_id, M._create_event_data(event_id, event_state))
 			end
 		end
@@ -936,22 +940,26 @@ function M.update_all(current_time)
 	end
 
 	local has_chained_events = false
-	for event_id, event_state in pairs(all_events) do
-		if type(event_state.after) == "string" then
-			has_chained_events = true
-		end
+	for _, event_id in ipairs(ordered_event_ids) do
+		-- A lifecycle callback of an earlier event could have removed this one
+		local event_state = all_events[event_id]
+		if event_state then
+			if type(event_state.after) == "string" then
+				has_chained_events = true
+			end
 
-		local status = event_state.status
-		if M._is_pending(status) or status == "paused" or status == "active"
-			or (status == "completed" and event_state.cycle) then
-			if M.update_event(event_id, current_time, last_update_time) then
-				any_updated = true
+			local status = event_state.status
+			if M._is_pending(status) or status == "paused" or status == "active"
+				or (status == "completed" and event_state.cycle) then
+				if M.update_event(event_id, current_time, last_update_time) then
+					any_updated = true
+				end
 			end
 		end
 	end
 
 	if has_chained_events then
-		any_updated = chaining.update_chained_events(all_events, current_time, last_update_time, M._is_pending, M.update_event) or any_updated
+		any_updated = chaining.update_chained_events(ordered_event_ids, current_time, last_update_time, M._is_pending, M.update_event) or any_updated
 	end
 
 	is_cold_start = false

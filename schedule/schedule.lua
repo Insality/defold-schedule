@@ -122,6 +122,8 @@ end
 ---The returned table is the live internal state, changing it changes the event.
 ---Prefer `get()` unless you specifically need raw state access.
 ---New events store `payload` as `{}` when omitted. A value passed to `:payload()` is kept as-is.
+---Change the declared configuration by re-declaring the event instead: `priority` is read from a
+---cached update order, so writing it here does not reorder anything until the event is saved again.
 ---@param event_id string The event ID to query
 ---@return schedule.event.state|nil event_state Raw event state table, or nil if event doesn't exist
 function M.get_event_state(event_id)
@@ -189,6 +191,22 @@ function M.register_condition(name, evaluator)
 	assert(evaluator == nil or type(evaluator) == "function", "Condition evaluator should be a function or nil")
 
 	conditions.register_condition(name, evaluator)
+end
+
+
+---Check a single registered condition right now, outside of any event. Use it to keep the gate
+---written once and reuse it in your game code: `if schedule.check_condition("scene", "main") then ... end`.
+---Asserts when the condition is not registered: a name typed by hand is a programmer error, not a game state.
+---@param name string Condition name registered with `register_condition()`
+---@param data any Data passed to the evaluator, same shape as in `event():condition(name, data)`
+---@return boolean is_passed True if the condition evaluator returned a truthy value
+function M.check_condition(name, data)
+	assert(type(name) == "string", "Condition name should be a string")
+	if not conditions.is_registered(name) then
+		error("Condition is not registered: " .. name)
+	end
+
+	return conditions.check_condition(name, data)
 end
 
 
