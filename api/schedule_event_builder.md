@@ -20,6 +20,7 @@
 - [on_disabled](#on_disabled)
 - [on_end](#on_end)
 - [on_fail](#on_fail)
+- [priority](#priority)
 - [abort_on_fail](#abort_on_fail)
 - [save](#save)
 ## Fields
@@ -305,6 +306,25 @@ Set callback called when the event fails (aborted due to condition failure). Use
 
 - **Parameters:**
 	- `callback` *(function)*: Callback receives event data: `{id, category, payload, status, start_time, end_time}`
+
+- **Returns:**
+	- `Self` *(schedule.event_builder)*: for method chaining
+
+### priority
+
+---
+```lua
+event_builder:priority(priority)
+```
+
+Set the start priority. Within one `update()` higher priority events are processed first,
+events with the same priority go by event id, so the order is the same on every run and platform.
+Use it when one event gates another: give the event that must win the higher priority, then a
+condition on the other one can already see it as active. Default is 10, so an event can be moved
+both above and below the others without negative numbers.
+
+- **Parameters:**
+	- `priority` *(number)*: Start priority, higher goes first, default 10
 
 - **Returns:**
 	- `Self` *(schedule.event_builder)*: for method chaining

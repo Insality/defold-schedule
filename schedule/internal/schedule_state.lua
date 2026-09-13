@@ -36,6 +36,7 @@
 ---@field abort_on_fail boolean|nil If true, set status to "aborted" when conditions fail (event will not retry)
 ---@field catch_up boolean|nil
 ---@field min_time number|nil Minimum time required to start
+---@field priority number|nil Start priority within one update, higher goes first, unset means 10
 
 ---@class schedule.state
 ---@field events table<string, schedule.event.state> Event ID -> state
@@ -49,6 +50,11 @@ local M = {}
 local GENERATED_ID_PREFIX = "schedule_"
 
 
+---Priority of an event that never called `priority()`. It is not written into the event state,
+---so a save file only carries the priorities that were set on purpose
+local DEFAULT_PRIORITY = 10
+
+
 ---Internal state
 ---@type schedule.state
 local state = {
@@ -58,11 +64,54 @@ local state = {
 }
 
 
+---Cached update order, see `get_ordered_event_ids`. Dropped when the event set changes
+---@type string[]|nil
+local ordered_event_ids = nil
+
+
+---Compare two events by update order: higher priority first, then by event id
+---@param event_id_a string
+---@param event_id_b string
+---@return boolean
+local function compare_update_order(event_id_a, event_id_b)
+	local priority_a = state.events[event_id_a].priority or DEFAULT_PRIORITY
+	local priority_b = state.events[event_id_b].priority or DEFAULT_PRIORITY
+	if priority_a ~= priority_b then
+		return priority_a > priority_b
+	end
+
+	return event_id_a < event_id_b
+end
+
+
+---Get event ids in update order: higher priority first, events with the same priority by event id.
+---The order decides which event wins when several become available in the same update, so it must
+---not depend on the hash order of the events table. The list is built once and kept until an event
+---is added, removed or the whole state is replaced, editing `priority` on a raw state table
+---directly does not invalidate it.
+---@return string[] event_ids Ordered event ids, do not modify
+function M.get_ordered_event_ids()
+	if ordered_event_ids then
+		return ordered_event_ids
+	end
+
+	local event_ids = {}
+	for event_id in pairs(state.events) do
+		event_ids[#event_ids + 1] = event_id
+	end
+	table.sort(event_ids, compare_update_order)
+
+	ordered_event_ids = event_ids
+	return event_ids
+end
+
+
 ---Reset state to default
 function M.reset()
 	state.events = {}
 	state.last_update_time = nil
 	state.events_created = 0
+	ordered_event_ids = nil
 end
 
 
@@ -77,6 +126,7 @@ end
 ---@param new_state schedule.state
 function M.set_state(new_state)
 	state = new_state or { events = {}, last_update_time = nil, events_created = 0 }
+	ordered_event_ids = nil
 	if not state.events then
 		state.events = {}
 	end
@@ -109,6 +159,7 @@ end
 ---@param event_state schedule.event.state
 function M.set_event_state(event_id, event_state)
 	state.events[event_id] = event_state
+	ordered_event_ids = nil
 end
 
 
@@ -156,6 +207,7 @@ function M.remove_event_state(event_id)
 	end
 
 	state.events[event_id] = nil
+	ordered_event_ids = nil
 	return true
 end
 
