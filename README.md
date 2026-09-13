@@ -50,10 +50,10 @@ Open your `game.project` file and add the following line to the dependencies fie
 https://github.com/Insality/defold-event/archive/refs/tags/20.zip
 ```
 
-**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/3.zip)**
+**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/4.zip)**
 
 ```
-https://github.com/Insality/defold-schedule/archive/refs/tags/3.zip
+https://github.com/Insality/defold-schedule/archive/refs/tags/4.zip
 ```
 
 
@@ -92,6 +92,7 @@ schedule.clear([category], [status])
 
 -- Conditions
 schedule.register_condition(name, [evaluator])
+schedule.check_condition(name, [data]) -- Evaluate one registered condition right now
 
 -- Time source, use it to run the schedule on server time
 schedule.set_time_function([callback])
@@ -150,6 +151,7 @@ schedule.event()
 	:end_at(time)
 	:infinity() -- Works until manual cancellation
 	:min_time(time) -- Do not start if the join window leftover is too short; cyclic events skip to the next occurrence
+	:priority(number) -- Start order within one update(), higher goes first. Default 10
 	-- Conditions
 	:condition(condition_name, data)
 	:abort_on_fail() -- Abort event when conditions fail
@@ -247,6 +249,13 @@ It starts with the two ways to use the schedule - **pull** (keep the event id an
 - `:duration(n, { exceed_end_time = true })`: join the slot / until `end_at`, run `n` seconds from join
 - After an exceed run, the next open slot starts when free (it is not burned)
 - `skip_missed` jumps to the current or next window; it does not activate missed occurrences
+
+### **V4**
+- `schedule.check_condition(name, data)` evaluates a registered condition on demand, outside of any event
+- `:priority(n)` sets the start order inside one `update()`, higher goes first, default 10
+- Events are processed in a deterministic order, the hash order of the state table no longer decides
+  who starts first when several events become available in the same update. Equal priorities go by
+  event id, the order is cached until an event is added or removed
 
 </details>
 
