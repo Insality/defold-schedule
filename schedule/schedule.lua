@@ -122,6 +122,8 @@ end
 ---The returned table is the live internal state, changing it changes the event.
 ---Prefer `get()` unless you specifically need raw state access.
 ---New events store `payload` as `{}` when omitted. A value passed to `:payload()` is kept as-is.
+---Change the declared configuration by re-declaring the event instead: `priority` is read from a
+---cached update order, so writing it here does not reorder anything until the event is saved again.
 ---@param event_id string The event ID to query
 ---@return schedule.event.state|nil event_state Raw event state table, or nil if event doesn't exist
 function M.get_event_state(event_id)

@@ -148,6 +148,25 @@ return function()
 		end)
 
 
+		it("Should follow a priority changed by re-declaring the event", function()
+			local started = {}
+			schedule.event("a_first"):after(60):duration(60):on_start(function() table.insert(started, "a_first") end):save()
+			schedule.event("b_second"):after(60):duration(60):on_start(function() table.insert(started, "b_second") end):save()
+
+			-- Builds and caches the update order while both events sit at the default priority
+			schedule.update()
+			assert(#started == 0, "Nothing should start yet")
+
+			-- Re-declaring is how a declared value is changed, and it rebuilds the order
+			schedule.event("b_second"):priority(20):save()
+
+			time = 60
+			schedule.update()
+			assert(started[1] == "b_second", "The raised priority should start first, got " .. tostring(started[1]))
+			assert(started[2] == "a_first", "The default priority should start second, got " .. tostring(started[2]))
+		end)
+
+
 		it("Should survive an event removed from a callback of another event", function()
 			schedule.event("a_remover")
 				:after(60)
