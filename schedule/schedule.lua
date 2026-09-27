@@ -59,9 +59,6 @@ M.WEEK = 604800
 ---When omitted, `payload` is `{}`; a value passed to `:payload()` is kept as-is.
 ---`callback_type` is one of `"start"`, `"enabled"`, `"disabled"`, `"end"`, `"fail"`
 ---@class schedule.queue.on_event: queue
----@field push fun(_, event: table)
----@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): any
----@field unsubscribe fun(_, subscription: any)
 M.on_event = lifecycle.event_queue
 
 
@@ -122,8 +119,8 @@ end
 ---The returned table is the live internal state, changing it changes the event.
 ---Prefer `get()` unless you specifically need raw state access.
 ---New events store `payload` as `{}` when omitted. A value passed to `:payload()` is kept as-is.
----Change the declared configuration by re-declaring the event instead: `priority` is read from a
----cached update order, so writing it here does not reorder anything until the event is saved again.
+---Change the declared configuration by re-declaring the event instead: `priority` is kept in an update order
+---index, so writing it here does not reorder anything until the event is saved again.
 ---@param event_id string The event ID to query
 ---@return schedule.event.state|nil event_state Raw event state table, or nil if event doesn't exist
 function M.get_event_state(event_id)

@@ -187,5 +187,56 @@ return function()
 			assert(not is_victim_started, "The removed event should not start")
 			assert(schedule.get("a_remover"):get_status() == "active", "The remover should be active")
 		end)
+
+
+		it("Should survive an event added from a callback of another event", function()
+			local started = {}
+			schedule.event("b_spawner")
+				:after(60)
+				:duration(schedule.HOUR)
+				:on_start(function()
+					table.insert(started, "b_spawner")
+					-- Sorts before the spawner, so an in-place insert would shift the running loop
+					schedule.event("a_spawned"):after(60):priority(20):on_start(function() table.insert(started, "a_spawned") end):save()
+				end)
+				:save()
+			schedule.event("c_neighbour"):after(60):on_start(function() table.insert(started, "c_neighbour") end):save()
+
+			time = 60
+			schedule.update()
+			assert(started[1] == "b_spawner", "Spawner should start first, got " .. tostring(started[1]))
+			assert(started[2] == "c_neighbour", "Neighbour should start once, got " .. tostring(started[2]))
+			assert(#started == 2, "Spawned event waits for the next update, got " .. #started)
+
+			time = 120
+			schedule.update()
+			assert(started[3] == "a_spawned", "Spawned event should start on the next update, got " .. tostring(started[3]))
+			assert(schedule.get_state().events["a_spawned"] ~= nil, "Spawned event should be stored")
+		end)
+
+
+		it("Should survive an event removed from the raw state table", function()
+			schedule.event("a_raw_removed"):after(60):duration(60):save()
+			schedule.event("b_kept"):after(60):duration(60):save()
+
+			schedule.get_state().events["a_raw_removed"] = nil
+			schedule.event("c_new"):after(60):duration(60):save()
+
+			time = 60
+			schedule.update()
+			assert(schedule.get("b_kept"):get_status() == "active", "Kept event should still update")
+			assert(schedule.get("c_new"):get_status() == "active", "New event should still update")
+			assert(schedule.get("a_raw_removed") == nil, "Removed event should stay removed")
+		end)
+
+
+		it("Should not write the update order into the saved state", function()
+			schedule.event("stored"):after(60):priority(5):save()
+			local state = schedule.get_state()
+			for key in pairs(state) do
+				assert(key == "events" or key == "last_update_time" or key == "events_created",
+					"Unexpected key in the saved state: " .. tostring(key))
+			end
+		end)
 	end)
 end
