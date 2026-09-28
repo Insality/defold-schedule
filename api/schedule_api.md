@@ -15,6 +15,7 @@
 - [set_time_function](#set_time_function)
 - [get_time](#get_time)
 - [register_condition](#register_condition)
+- [check_condition](#check_condition)
 - [update](#update)
 - [filter](#filter)
 - [set_logger](#set_logger)
@@ -195,6 +196,24 @@ use AND logic - all must pass. If any fails and `abort_on_fail()` is set, event 
 - **Parameters:**
 	- `name` *(string)*: Condition name to use in `event():condition(name, data)`
 	- `[evaluator]` *(fun(data: any):boolean|nil)*: Function that returns true if condition passes, nil to unregister
+
+### check_condition
+
+---
+```lua
+schedule.check_condition(name, [data])
+```
+
+Check a single registered condition right now, outside of any event. Use it to keep the gate
+written once and reuse it in your game code: `if schedule.check_condition("scene", "main") then ... end`.
+Asserts when the condition is not registered: a name typed by hand is a programmer error, not a game state.
+
+- **Parameters:**
+	- `name` *(string)*: Condition name registered with `register_condition()`
+	- `[data]` *(any)*: Data passed to the evaluator, same shape as in `event():condition(name, data)`
+
+- **Returns:**
+	- `is_passed` *(boolean)*: True if the condition evaluator returned a truthy value
 
 ### update
 
