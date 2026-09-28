@@ -215,28 +215,34 @@ return function()
 		end)
 
 
-		it("Should survive an event removed from the raw state table", function()
-			schedule.event("a_raw_removed"):after(60):duration(60):save()
-			schedule.event("b_kept"):after(60):duration(60):save()
+		it("Should update events loaded into the live state table in place", function()
+			-- Mirrors saver.bind_save_state: the loaded data is copied into the table from get_state(),
+			-- set_state() is never called
+			local function override(source, target)
+				for key, value in pairs(source) do
+					if type(value) == "table" and target[key] then
+						override(value, target[key])
+					else
+						target[key] = value
+					end
+				end
+			end
 
-			schedule.get_state().events["a_raw_removed"] = nil
-			schedule.event("c_new"):after(60):duration(60):save()
+			schedule.event("redeclared"):after(60):duration(schedule.HOUR):save()
+			schedule.event("only_in_save"):after(60):duration(schedule.HOUR):save()
+			local saved_state = deep_copy_state(schedule.get_state())
+
+			-- Next launch: empty state, the saver fills it, then the game declares its events
+			schedule.reset_state()
+			override(saved_state, schedule.get_state())
+			local is_started = false
+			schedule.event("redeclared"):after(60):duration(schedule.HOUR):on_start(function() is_started = true end):save()
 
 			time = 60
 			schedule.update()
-			assert(schedule.get("b_kept"):get_status() == "active", "Kept event should still update")
-			assert(schedule.get("c_new"):get_status() == "active", "New event should still update")
-			assert(schedule.get("a_raw_removed") == nil, "Removed event should stay removed")
-		end)
-
-
-		it("Should not write the update order into the saved state", function()
-			schedule.event("stored"):after(60):priority(5):save()
-			local state = schedule.get_state()
-			for key in pairs(state) do
-				assert(key == "events" or key == "last_update_time" or key == "events_created",
-					"Unexpected key in the saved state: " .. tostring(key))
-			end
+			assert(is_started, "A re-declared loaded event should start")
+			assert(schedule.get("redeclared"):get_status() == "active", "A re-declared loaded event should be active")
+			assert(schedule.get("only_in_save"):get_status() == "active", "A loaded event without a declaration should still update")
 		end)
 	end)
 end

@@ -64,21 +64,9 @@ local state = {
 }
 
 
----Runtime data derived from `state`, it is never serialized and is rebuilt on `set_state()`
----@class schedule.state_runtime
----@field ordered_event_ids string[] Event ids in update order, see `get_ordered_event_ids`
-
----@type schedule.state_runtime
-local runtime = {
-	ordered_event_ids = {},
-}
-
-
----@param event_id string
----@return number
-local function get_priority(event_id)
-	return state.events[event_id].priority or DEFAULT_PRIORITY
-end
+---Cached update order, see `get_ordered_event_ids`. Dropped when the event set changes
+---@type string[]|nil
+local ordered_event_ids = nil
 
 
 ---Compare two events by update order: higher priority first, then by event id
@@ -86,8 +74,8 @@ end
 ---@param event_id_b string
 ---@return boolean
 local function compare_update_order(event_id_a, event_id_b)
-	local priority_a = get_priority(event_id_a)
-	local priority_b = get_priority(event_id_b)
+	local priority_a = state.events[event_id_a].priority or DEFAULT_PRIORITY
+	local priority_b = state.events[event_id_b].priority or DEFAULT_PRIORITY
 	if priority_a ~= priority_b then
 		return priority_a > priority_b
 	end
@@ -96,50 +84,26 @@ local function compare_update_order(event_id_a, event_id_b)
 end
 
 
----Rebuild the update order from scratch, used when the whole events table is replaced
-local function rebuild_order()
+---Get event ids in update order: higher priority first, events with the same priority by event id.
+---The order decides which event wins when several become available in the same update, so it must
+---not depend on the hash order of the events table. The list is built once and kept until an event
+---is added, removed or the whole state is replaced, editing `priority` on a raw state table
+---directly does not invalidate it. It must stay lazy: save systems copy loaded events straight into
+---the live state table (`saver.bind_save_state`), and only a list built on the first update sees them.
+---@return string[] event_ids Ordered event ids, do not modify
+function M.get_ordered_event_ids()
+	if ordered_event_ids then
+		return ordered_event_ids
+	end
+
 	local event_ids = {}
 	for event_id in pairs(state.events) do
 		event_ids[#event_ids + 1] = event_id
 	end
 	table.sort(event_ids, compare_update_order)
-	runtime.ordered_event_ids = event_ids
-end
 
-
----Put an event into the update order, or move it if it is already there.
----The order list is replaced, not changed in place: `update_all` may be iterating the old one
----while a lifecycle callback adds or removes events
----@param event_id string
----@param is_insert boolean False to only remove the event from the order
-local function update_order(event_id, is_insert)
-	local event_ids = {}
-	local is_inserted = not is_insert
-	for _, other_id in ipairs(runtime.ordered_event_ids) do
-		-- An event removed from the raw events table directly is dropped here instead of breaking the compare
-		if other_id ~= event_id and state.events[other_id] then
-			if not is_inserted and compare_update_order(event_id, other_id) then
-				event_ids[#event_ids + 1] = event_id
-				is_inserted = true
-			end
-			event_ids[#event_ids + 1] = other_id
-		end
-	end
-	if not is_inserted then
-		event_ids[#event_ids + 1] = event_id
-	end
-
-	runtime.ordered_event_ids = event_ids
-end
-
-
----Get event ids in update order: higher priority first, events with the same priority by event id.
----The order decides which event wins when several become available in the same update, so it must
----not depend on the hash order of the events table. It is kept in sync on every event write,
----editing `priority` on a raw state table directly does not move the event.
----@return string[] event_ids Ordered event ids, do not modify
-function M.get_ordered_event_ids()
-	return runtime.ordered_event_ids
+	ordered_event_ids = event_ids
+	return event_ids
 end
 
 
@@ -148,7 +112,7 @@ function M.reset()
 	state.events = {}
 	state.last_update_time = nil
 	state.events_created = 0
-	runtime.ordered_event_ids = {}
+	ordered_event_ids = nil
 end
 
 
@@ -163,10 +127,10 @@ end
 ---@param new_state schedule.state
 function M.set_state(new_state)
 	state = new_state or { events = {}, last_update_time = nil, events_created = 0 }
+	ordered_event_ids = nil
 	if not state.events then
 		state.events = {}
 	end
-	rebuild_order()
 
 	-- The counter can be missing in states written by other tools or older versions.
 	-- Restore it above the highest generated id to keep new ids unique
@@ -195,12 +159,8 @@ end
 ---@param event_id string
 ---@param event_state schedule.event.state
 function M.set_event_state(event_id, event_state)
-	local previous_state = state.events[event_id]
 	state.events[event_id] = event_state
-
-	if not previous_state or previous_state.priority ~= event_state.priority then
-		update_order(event_id, true)
-	end
+	ordered_event_ids = nil
 end
 
 
@@ -248,7 +208,7 @@ function M.remove_event_state(event_id)
 	end
 
 	state.events[event_id] = nil
-	update_order(event_id, false)
+	ordered_event_ids = nil
 	return true
 end
 
