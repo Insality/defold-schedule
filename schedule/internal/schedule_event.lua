@@ -2,6 +2,7 @@ local time = require("schedule.internal.schedule_time")
 local state = require("schedule.internal.schedule_state")
 local lifecycle = require("schedule.internal.schedule_lifecycle")
 local processor = require("schedule.internal.schedule_processor")
+local conditions = require("schedule.internal.schedule_conditions")
 
 
 ---@class schedule.event
@@ -165,6 +166,31 @@ end
 ---@return number|nil start_time Event start time in seconds or nil
 function M:get_start_time()
 	return self.state.start_time
+end
+
+
+---Get when a pending event starts by its schedule, without looking at conditions.
+---Use it to prepare the event content ahead of time. A value at or below `schedule.get_time()` means
+---the start time has come and the event waits for its conditions, see `get_failed_conditions()`.
+---Returns the stored start time, so call it after `update()`: a cyclic occurrence that has already
+---closed is moved to the next one by the next `update()`. Does not change the state.
+---@return number|nil start_time Expected start in seconds, or nil when the event is not pending or the start
+---is not known yet (an event chained after another one gets its start when the parent ends)
+function M:get_expected_start_time()
+	if self:get_status() ~= "pending" then
+		return nil
+	end
+
+	return self.state.start_time
+end
+
+
+---Get the event conditions that fail right now, in declaration order.
+---Checks every condition, does not apply `abort_on_fail` and does not change the state.
+---An unregistered condition counts as failed. Works for any status. `data` is not a copy, do not change it.
+---@return schedule.condition_data[] failed_conditions `{ name, data }` entries, empty when all pass or there are none
+function M:get_failed_conditions()
+	return conditions.get_failed_conditions(self.state)
 end
 
 

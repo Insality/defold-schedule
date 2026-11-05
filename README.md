@@ -50,10 +50,10 @@ Open your `game.project` file and add the following line to the dependencies fie
 https://github.com/Insality/defold-event/archive/refs/tags/20.zip
 ```
 
-**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/3.zip)**
+**[Defold Schedule](https://github.com/Insality/defold-schedule/archive/refs/tags/5.zip)**
 
 ```
-https://github.com/Insality/defold-schedule/archive/refs/tags/3.zip
+https://github.com/Insality/defold-schedule/archive/refs/tags/5.zip
 ```
 
 
@@ -86,12 +86,15 @@ schedule.update()
 schedule.event([id]) -- Returns a builder, see below
 schedule.get(event_id) -- Returns an event object
 schedule.get_event_state(event_id) -- Returns the raw state table
+schedule.get_expected_start_time(event_id) -- When a pending event starts by its schedule
+schedule.get_failed_conditions(event_id) -- Conditions that fail right now
 schedule.filter([category], [status])
 schedule.remove(event_id)
 schedule.clear([category], [status])
 
 -- Conditions
 schedule.register_condition(name, [evaluator])
+schedule.check_condition(name, [data]) -- Evaluate one registered condition right now
 
 -- Time source, use it to run the schedule on server time
 schedule.set_time_function([callback])
@@ -123,6 +126,8 @@ event:get_time_to_start()
 event:get_progress()
 event:get_start_time()
 event:get_end_time()
+event:get_expected_start_time()
+event:get_failed_conditions()
 event:get_cycle_count()
 event:get_category()
 event:get_payload()
@@ -150,6 +155,7 @@ schedule.event()
 	:end_at(time)
 	:infinity() -- Works until manual cancellation
 	:min_time(time) -- Do not start if the join window leftover is too short; cyclic events skip to the next occurrence
+	:priority(number) -- Start order within one update(), higher goes first. Default 10
 	-- Conditions
 	:condition(condition_name, data)
 	:abort_on_fail() -- Abort event when conditions fail
@@ -180,6 +186,43 @@ For detailed API documentation, please refer to:
 - [Event Builder API](api/schedule_event_builder.md)
 - [Event API](api/schedule_event.md)
 
+
+## Know the event start ahead of time
+
+Download the event content (windows, packs) before the event starts. `get_expected_start_time()` tells
+when a pending event starts by its schedule, `get_failed_conditions()` tells which conditions hold it back.
+Both only read: no state changes, no lifecycle callbacks, no `abort_on_fail`.
+
+```lua
+local function check_event(event_id)
+	local start_time = schedule.get_expected_start_time(event_id)
+	if not start_time then
+		return -- Not pending, or the start is not known yet
+	end
+
+	if start_time > schedule.get_time() then
+		-- Start is ahead, there is time to prepare
+		download_content(event_id, start_time - schedule.get_time())
+		return
+	end
+
+	-- Start time has come, the event waits for its conditions
+	for _, condition in ipairs(schedule.get_failed_conditions(event_id)) do
+		print("Waiting for", condition.name, condition.data)
+	end
+end
+```
+
+The same is available on the event object: `schedule.get(id):get_expected_start_time()` and
+`schedule.get(id):get_failed_conditions()`.
+
+- The value is read from the state, so call these after `update()`. A cyclic occurrence that closed
+  while the event waited for its conditions keeps its old start time until the next `update()` moves
+  it to the next occurrence. Right after `set_state()` call `update()` first as well.
+- An event chained with `:after("other_event")` has no start time until the parent ends, the result is `nil` until then.
+- `get_failed_conditions()` checks every condition in declaration order, not only the first failed one.
+  An unregistered condition counts as failed. The returned `data` is the value the event was declared
+  with, not a copy: read it, do not change it. Your evaluators are called, keep them free of side effects.
 
 ## Persistence
 
@@ -247,6 +290,17 @@ It starts with the two ways to use the schedule - **pull** (keep the event id an
 - `:duration(n, { exceed_end_time = true })`: join the slot / until `end_at`, run `n` seconds from join
 - After an exceed run, the next open slot starts when free (it is not burned)
 - `skip_missed` jumps to the current or next window; it does not activate missed occurrences
+
+### **V4**
+- `schedule.check_condition(name, data)` evaluates a registered condition on demand, outside of any event
+- `:priority(n)` sets the start order inside one `update()`, higher goes first, default 10
+- Events are processed in a deterministic order, the hash order of the state table no longer decides
+  who starts first when several events become available in the same update. Equal priorities go by
+  event id, the order is cached until an event is added or removed
+
+### **V5**
+- `schedule.get_expected_start_time(id)` and `event:get_expected_start_time()` tell when a pending event starts by its schedule
+- `schedule.get_failed_conditions(id)` and `event:get_failed_conditions()` list the conditions that fail right now
 
 </details>
 

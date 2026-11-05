@@ -309,6 +309,21 @@ function M:on_fail(callback)
 end
 
 
+---Set the start priority. Within one `update()` higher priority events are processed first,
+---events with the same priority go by event id, so the order is the same on every run and platform.
+---Use it when one event gates another: give the event that must win the higher priority, then a
+---condition on the other one can already see it as active. Default is 10, so an event can be moved
+---both above and below the others without negative numbers.
+---@param priority number Start priority, higher goes first, default 10
+---@return schedule.event_builder Self for method chaining
+function M:priority(priority)
+	assert(type(priority) == "number", "Event priority should be a number")
+
+	self.config.priority = priority
+	return self
+end
+
+
 ---Set flag to abort event when conditions fail. When conditions fail, event status will be set to "aborted" and will not retry.
 ---@return schedule.event_builder Self for method chaining
 function M:abort_on_fail()
@@ -452,7 +467,8 @@ function M._build_event_state(config, event_id, current_time, existing_state)
 		conditions = merge_value(config.conditions, existing_state and existing_state.conditions),
 		abort_on_fail = merge_value(config.abort_on_fail, existing_state and existing_state.abort_on_fail),
 		catch_up = M._resolve_catch_up(config, existing_state),
-		min_time = merge_value(config.min_time, existing_state and existing_state.min_time)
+		min_time = merge_value(config.min_time, existing_state and existing_state.min_time),
+		priority = merge_value(config.priority, existing_state and existing_state.priority)
 	}
 end
 

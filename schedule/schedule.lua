@@ -59,9 +59,6 @@ M.WEEK = 604800
 ---When omitted, `payload` is `{}`; a value passed to `:payload()` is kept as-is.
 ---`callback_type` is one of `"start"`, `"enabled"`, `"disabled"`, `"end"`, `"fail"`
 ---@class schedule.queue.on_event: queue
----@field push fun(_, event: table)
----@field subscribe fun(_, callback: fun(event: table): boolean|nil, context: any): any
----@field unsubscribe fun(_, subscription: any)
 M.on_event = lifecycle.event_queue
 
 
@@ -122,10 +119,40 @@ end
 ---The returned table is the live internal state, changing it changes the event.
 ---Prefer `get()` unless you specifically need raw state access.
 ---New events store `payload` as `{}` when omitted. A value passed to `:payload()` is kept as-is.
+---Change the declared configuration by re-declaring the event instead: `priority` is read from a
+---cached update order, so writing it here does not reorder anything until the event is saved again.
 ---@param event_id string The event ID to query
 ---@return schedule.event.state|nil event_state Raw event state table, or nil if event doesn't exist
 function M.get_event_state(event_id)
 	return state.get_event_state(event_id)
+end
+
+
+---Get when a pending event starts by its schedule, without looking at conditions.
+---Use it to download or prepare the event content ahead of time. A value at or below `get_time()`
+---means the start time has come and the event waits for its conditions, see `get_failed_conditions()`.
+---Call it after `update()`: the value is read from the state, a cyclic occurrence that has already
+---closed is moved to the next one by the next `update()`. Does not change the state.
+---@param event_id string The event ID to query
+---@return number|nil start_time Expected start in seconds, or nil when the event does not exist, is not pending
+---or its start is not known yet (an event chained after another one gets its start when the parent ends)
+function M.get_expected_start_time(event_id)
+	local event = M.get(event_id)
+	return event and event:get_expected_start_time() or nil
+end
+
+
+---Get the event conditions that fail right now, in declaration order. Use it to show the player
+---what holds a pending event back. Uses the same evaluators as `update()`, checks every condition,
+---does not apply `abort_on_fail` and does not change the state. An unregistered condition counts as failed.
+---Your evaluators are called, keep them free of side effects. `data` is the value the event was declared with,
+---not a copy: read it, do not change it.
+---@param event_id string The event ID to query
+---@return schedule.condition_data[]|nil failed_conditions `{ name, data }` entries, empty when all pass or
+---there are none, nil when the event does not exist
+function M.get_failed_conditions(event_id)
+	local event = M.get(event_id)
+	return event and event:get_failed_conditions() or nil
 end
 
 
@@ -189,6 +216,22 @@ function M.register_condition(name, evaluator)
 	assert(evaluator == nil or type(evaluator) == "function", "Condition evaluator should be a function or nil")
 
 	conditions.register_condition(name, evaluator)
+end
+
+
+---Check a single registered condition right now, outside of any event. Use it to keep the gate
+---written once and reuse it in your game code: `if schedule.check_condition("scene", "main") then ... end`.
+---Asserts when the condition is not registered: a name typed by hand is a programmer error, not a game state.
+---@param name string Condition name registered with `register_condition()`
+---@param data any Data passed to the evaluator, same shape as in `event():condition(name, data)`
+---@return boolean is_passed True if the condition evaluator returned a truthy value
+function M.check_condition(name, data)
+	assert(type(name) == "string", "Condition name should be a string")
+	if not conditions.is_registered(name) then
+		error("Condition is not registered: " .. name)
+	end
+
+	return conditions.check_condition(name, data)
 end
 
 
