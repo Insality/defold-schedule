@@ -10,6 +10,8 @@
 - [event](#event)
 - [get](#get)
 - [get_event_state](#get_event_state)
+- [get_expected_start_time](#get_expected_start_time)
+- [get_failed_conditions](#get_failed_conditions)
 - [remove](#remove)
 - [clear](#clear)
 - [set_time_function](#set_time_function)
@@ -120,6 +122,46 @@ New events store `payload` as `{}` when omitted. A value passed to `:payload()` 
 
 - **Returns:**
 	- `event_state` *(schedule.event.state|nil)*: Raw event state table, or nil if event doesn't exist
+
+### get_expected_start_time
+
+---
+```lua
+schedule.get_expected_start_time(event_id)
+```
+
+Get when a pending event starts by its schedule, without looking at conditions.
+Use it to download or prepare the event content ahead of time. A value at or below `get_time()`
+means the start time has come and the event waits for its conditions, see `get_failed_conditions()`.
+Call it after `update()`: the value is read from the state, a cyclic occurrence that has already
+closed is moved to the next one by the next `update()`. Does not change the state.
+
+- **Parameters:**
+	- `event_id` *(string)*: The event ID to query
+
+- **Returns:**
+	- `start_time` *(number|nil)*: Expected start in seconds, or nil when the event does not exist, is not pending
+or its start is not known yet (an event chained after another one gets its start when the parent ends)
+
+### get_failed_conditions
+
+---
+```lua
+schedule.get_failed_conditions(event_id)
+```
+
+Get the event conditions that fail right now, in declaration order. Use it to show the player
+what holds a pending event back. Uses the same evaluators as `update()`, checks every condition,
+does not apply `abort_on_fail` and does not change the state. An unregistered condition counts as failed.
+Your evaluators are called, keep them free of side effects. `data` is the value the event was declared with,
+not a copy: read it, do not change it.
+
+- **Parameters:**
+	- `event_id` *(string)*: The event ID to query
+
+- **Returns:**
+	- `failed_conditions` *(schedule.condition_data[]|nil)*: `{ name, data }` entries, empty when all pass or
+there are none, nil when the event does not exist
 
 ### remove
 

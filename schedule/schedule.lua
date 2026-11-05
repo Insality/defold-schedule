@@ -128,6 +128,34 @@ function M.get_event_state(event_id)
 end
 
 
+---Get when a pending event starts by its schedule, without looking at conditions.
+---Use it to download or prepare the event content ahead of time. A value at or below `get_time()`
+---means the start time has come and the event waits for its conditions, see `get_failed_conditions()`.
+---Call it after `update()`: the value is read from the state, a cyclic occurrence that has already
+---closed is moved to the next one by the next `update()`. Does not change the state.
+---@param event_id string The event ID to query
+---@return number|nil start_time Expected start in seconds, or nil when the event does not exist, is not pending
+---or its start is not known yet (an event chained after another one gets its start when the parent ends)
+function M.get_expected_start_time(event_id)
+	local event = M.get(event_id)
+	return event and event:get_expected_start_time() or nil
+end
+
+
+---Get the event conditions that fail right now, in declaration order. Use it to show the player
+---what holds a pending event back. Uses the same evaluators as `update()`, checks every condition,
+---does not apply `abort_on_fail` and does not change the state. An unregistered condition counts as failed.
+---Your evaluators are called, keep them free of side effects. `data` is the value the event was declared with,
+---not a copy: read it, do not change it.
+---@param event_id string The event ID to query
+---@return schedule.condition_data[]|nil failed_conditions `{ name, data }` entries, empty when all pass or
+---there are none, nil when the event does not exist
+function M.get_failed_conditions(event_id)
+	local event = M.get(event_id)
+	return event and event:get_failed_conditions() or nil
+end
+
+
 ---Remove an event completely, dropping its state and its lifecycle callbacks.
 ---Completed events stay in the state until removed, so clean up one-shot events you no longer need
 ---to keep the save file small.
